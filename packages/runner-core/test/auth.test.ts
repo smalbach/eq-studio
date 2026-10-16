@@ -3,7 +3,7 @@ import { createServer, type IncomingMessage } from "node:http";
 import type { AddressInfo } from "node:net";
 import test from "node:test";
 import { createMockServer } from "../../../apps/mock-target/server.mjs";
-import { cookieHeaderOf, createAuthenticator, fillLoginBody, hmacHeaders } from "../src/index.ts";
+import { cookieHeaderOf, createAuthenticator, fillLoginBody, hmacHeaders } from "../src/auth.ts";
 
 async function mock() {
   const server = createMockServer({ auth: true });

@@ -4,7 +4,8 @@
  * `ResolvedCredential` for a run.
  */
 import { createPrivateKey, X509Certificate } from "node:crypto";
-import { HMAC_PLACEHOLDERS, type ResolvedCredential } from "@eq/runner-core";
+import type { ResolvedCredential } from "@eq/runner-core";
+import { HMAC_PLACEHOLDERS } from "@eq/runner-core/auth";
 import type { CredentialKind, CredentialOptions, CredentialRow, CredentialSecretName } from "../../../database/entities.ts";
 import { Invalid } from "../../../shared/errors.ts";
 import { lastFour, type SecretBox } from "../../../shared/secret-box.ts";

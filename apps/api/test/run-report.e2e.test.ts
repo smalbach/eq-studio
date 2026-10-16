@@ -14,6 +14,7 @@ before(async () => {
   h = await start(databases()[0].config());
   const { url } = await broken.listen(0);
   await h.request("POST", "/v1/projects/import", { file: example });
+  await h.request("PATCH", "/v1/projects/mock-store/environments/local", { baseUrl: h.mock });
   await h.request("PATCH", "/v1/projects/mock-store/environments/local-auth", { baseUrl: url });
   await h.request("PUT", "/v1/projects/mock-store/environments/local-auth/credentials/primary", { kind: "bearer", secret: "admin-token" });
   runId = (await h.request("POST", "/v1/projects/mock-store/runs", { environment: "local-auth", readOnly: true })).body.id;

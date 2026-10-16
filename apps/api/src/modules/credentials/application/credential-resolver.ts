@@ -1,5 +1,6 @@
 import { Inject, Injectable } from "@nestjs/common";
-import { createAuthenticator, type ScenarioAuth, type TlsMaterial } from "@eq/runner-core";
+import type { ScenarioAuth, TlsMaterial } from "@eq/runner-core";
+import { createAuthenticator } from "@eq/runner-core/auth";
 import type { CredentialRole, CredentialRow } from "../../../database/entities.ts";
 import { Unreachable } from "../../../shared/errors.ts";
 import { isoNow } from "../../../shared/ids.ts";

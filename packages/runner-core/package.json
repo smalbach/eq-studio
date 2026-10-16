@@ -6,6 +6,7 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
+    "./auth": "./src/auth.ts",
     "./load": "./src/load.mjs",
     "./load-degradation": "./src/load-degradation.mjs",
     "./report": "./src/report/index.ts"
