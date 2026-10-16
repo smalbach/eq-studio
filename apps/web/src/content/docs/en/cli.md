@@ -55,7 +55,9 @@ eq run --file store-api.eq.json --env staging \
 - `--base-url` replaces the environment's URL: the same file serves every branch or deployment.
 - Credentials come from flags or variables (`EQ_TOKEN`, `EQ_READ_TOKEN`, `EQ_API_KEY`), never
   from the file: the `.eq.json` is versioned without secrets.
-- `--junit` writes a JUnit XML report. `--json` saves the whole run.
+- `--junit` writes a JUnit XML report, `--html` one self-contained page to share and `--sarif`
+  a SARIF file for code scanning (see "Shareable reports" below). `--json` saves the
+  whole run.
 
 | Option | What it does |
 |---|---|
@@ -72,6 +74,8 @@ eq run --file store-api.eq.json --env staging \
 | `--locale es\|en` | Language of the case names (default `en`). |
 | `--scope "name"` | A name for the run in the history and in the report. |
 | `--junit file.xml` · `--json file.json` | Reports. |
+| `--html report.html` · `--sarif report.sarif` | Shareable reports: one HTML page, SARIF 2.1.0. Combinable with `--junit`. |
+| `--contract <file>` | The contract file SARIF results point at (default: the `--file`). |
 | `--format text\|json` · `-q, --quiet` | What is printed: text (default), JSON or nothing. |
 | `--fail-on-blocked` | Exits `1` if the environment blocked writes. |
 
@@ -104,13 +108,28 @@ read from `EQ_API_URL`.
 ```yaml
 - uses: actions/setup-node@v4
   with: { node-version: 22 }
-- run: npx endpoint-quality run --file store-api.eq.json --env staging --base-url ${{ vars.STAGING_URL }} --junit eq-report.xml
+- run: >-
+    npx endpoint-quality run --file store-api.eq.json --env staging --base-url ${{ vars.STAGING_URL }}
+    --junit eq-report.xml --html eq-report.html --sarif eq-report.sarif --contract openapi.yaml
   env:
     EQ_TOKEN: ${{ secrets.STAGING_TOKEN }}
+# The failed cases as code scanning alerts, next to the contract (needs `security-events: write`).
+- uses: github/codeql-action/upload-sarif@v3
+  if: always()
+  with:
+    sarif_file: eq-report.sarif
+    category: endpoint-quality
+# The HTML page and the JUnit, attached to the workflow run.
 - uses: actions/upload-artifact@v4
   if: always()
-  with: { name: eq-report, path: eq-report.xml }
+  with:
+    name: eq-report
+    path: |
+      eq-report.html
+      eq-report.xml
 ```
+
+The job needs `permissions: { contents: read, security-events: write }` for the SARIF upload.
 
 ### Other CI systems
 
@@ -147,6 +166,40 @@ Azure DevOps:
   inputs: { testResultsFormat: JUnit, testResultsFiles: eq-report.xml }
 ```
 
+## Shareable reports
+
+A finished run can be written as three kinds of file, from the CLI or from the app:
+
+- **HTML** (`--html report.html`): one self-contained page — styles and the little script inline,
+  no request to anywhere, light or dark as the reader's system, printable. The summary first
+  (verdict, totals, durations, environment, contract version), then the failures with each
+  request, response and assertion, then a filterable table of every case. A load test shows its
+  percentiles and the criteria of its verdict.
+- **SARIF 2.1.0** (`--sarif report.sarif`): each failed case is a result whose rule is the kind
+  of scenario (`not-found`, `auth-none`, `create-read`…), at level `error` — `warning` when only
+  the latency budget failed —, located at the operation (`GET /orders/{id}`). When the contract
+  file is known (`--file`, or `--contract openapi.yaml`) the result also points at the line that
+  declares the operation, so GitHub shows the alert next to the contract. Blocked cases are not
+  results.
+- **JUnit XML** (`--junit report.xml`): see above.
+
+Secrets never reach a report: the tokens the run was given, members named like a credential
+(`authorization`, `token`, `password`…), `Bearer`/`Basic` values and credential-like query
+parameters are masked as `••••••••`.
+
+A stored run can be rendered again later with `eq report`:
+
+```bash
+# A run saved with --json: no server needed.
+eq report run.json --format html -o report.html
+# A run on an API, by its id.
+eq report 01a144b9-f552-7092-9e12-ec62710a18f2 --format sarif -o report.sarif --api http://eq.internal:4400
+```
+
+`--format` is `html` (the default), `sarif` or `junit`; without `-o` it prints to standard output.
+The API answers the same at `GET /v1/runs/{id}/report?format=html|sarif|junit`, and in the app
+the run view has a **Download report** menu.
+
 ## Load tests
 
 ```bash
@@ -156,8 +209,8 @@ eq load --file store-api.eq.json --env staging --type stress --rps 10 --peak 100
 `--type` is `load`, `stress`, `spike` or `soak`; `--mix` picks one of the project's mixes; `--p95`
 sets a limit of your own (or `--no-latency` to not enforce latency); `--preflight stop|skip|ignore`
 decides what happens to a target that fails the preflight (default `skip`). Exits with `1` when the
-verdict fails. `--junit`, `--json` and `--format` work as in `eq run`: the JUnit has one test per
-verdict criterion. Against a shared environment, coordinate with the team.
+verdict fails. `--junit`, `--html`, `--sarif`, `--json` and `--format` work as in `eq run`: the
+JUnit has one test per verdict criterion, SARIF one result per failed criterion. Against a shared environment, coordinate with the team.
 
 As a CI gate, a short test at the expected rate with a p95 of your own:
 

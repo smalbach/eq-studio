@@ -1,6 +1,7 @@
 import { Check, Download, X, Zap } from "lucide-react";
 import { CHART } from "@/lib/chart-colors";
 import { Badge, Button, Table } from "@radix-ui/themes";
+import { ReportMenu } from "@/components/report-menu";
 import { Card } from "@/components/ui/card";
 import { LineChart } from "@/components/charts/line-chart";
 import { InfoTip } from "@/components/info-tip";
@@ -131,7 +132,7 @@ export function LoadCharts({ windows, budget }: { windows: LoadWindow[]; budget:
  * histogram, why requests failed, and the per-target and per-stage tables. The same view shows
  * the run that just finished and any run of the history.
  */
-export function LoadReportView({ report: saved, type, title, subtitle, onExport, budget }: { report: LoadReport; type: TestType; title: string; subtitle?: string; onExport?: () => void; budget: number | null }) {
+export function LoadReportView({ report: saved, type, title, subtitle, onExport, budget, runId, reportName }: { report: LoadReport; type: TestType; title: string; subtitle?: string; onExport?: () => void; budget: number | null; runId?: string; reportName?: string }) {
   const t = useMessages(MESSAGES);
   const intl = useIntlLocale();
   const locale = useLocale();
@@ -149,7 +150,10 @@ export function LoadReportView({ report: saved, type, title, subtitle, onExport,
         <div className="mb-3 flex items-center justify-between gap-2"><div><p className="flex items-center gap-2 text-sm font-semibold"><Zap className="size-4 text-slate-400"/>{title}<InfoTip id="verdict"/></p>{subtitle && <p className="mt-0.5 text-[11px] text-slate-500">{subtitle}</p>}</div><Badge size="1" variant="soft" color={report.verdict.pass ? "jade" : "ruby"}>{report.verdict.pass ? t.pass : t.fail}</Badge></div>
         <div className="space-y-3">{report.verdict.checks.map((check) => <div key={check.label} className="flex gap-3"><span className={cn("mt-0.5 grid size-5 shrink-0 place-items-center rounded-full", check.pass ? "bg-emerald-100 text-emerald-600" : "bg-rose-100 text-rose-600")}>{check.pass ? <Check className="size-3"/> : <X className="size-3"/>}</span><div className="min-w-0"><p className="text-xs font-medium">{check.label}</p><p className="mt-0.5 break-words text-[11px] leading-5 text-slate-500">{check.detail}</p></div></div>)}</div>
         <p className="mt-3 text-[10px] text-slate-400">{t.latencyMode}{report.latencyMode?.mode === "custom" ? t.customLimit(report.latencyMode.p95Ms) : report.latencyMode?.mode === "off" ? t.informative : t.projectBudgets}</p>
-        {onExport && <Button size="1" variant="surface" color="gray" onClick={onExport} className="mt-4 print:hidden"><Download className="size-3.5"/>{t.exportJson}</Button>}
+        {(onExport || runId) && <div className="mt-4 flex flex-wrap gap-2 print:hidden">
+          {onExport && <Button size="1" variant="surface" color="gray" onClick={onExport}><Download className="size-3.5"/>{t.exportJson}</Button>}
+          {runId && <ReportMenu runId={runId} name={reportName ?? `eq-load-${runId}`}/>}
+        </div>}
       </Card>
       <div className="space-y-4">
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 2xl:grid-cols-6">

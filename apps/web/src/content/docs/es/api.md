@@ -33,6 +33,7 @@ En modo local el API escucha en `http://127.0.0.1:4400`, solo en el loopback y s
 | `POST /v1/projects/:project/probe` | Un caso suelto, sin guardar: `environment`, `operationId`, `scenarioId`, `parameters?`, `body?`. |
 | `GET /v1/projects/:project/runs` | Historial (`?kind=functional\|load`, `?limit=`). |
 | `GET /v1/runs/:run` | Una corrida y sus casos (`?steps=true` con cada solicitud). |
+| `GET /v1/runs/:run/report` | La corrida como archivo para compartir: `?format=html` (por defecto, una página autocontenida), `sarif` (SARIF 2.1.0) o `junit`; `&locale=es\|en`. Secretos enmascarados. |
 | `DELETE /v1/runs/:run` | Borra una corrida del historial. |
 | `GET /v1/runs/:run/stream` | Server-sent events: `snapshot`, `case`, `progress`, `finished`. |
 | `POST /v1/runs/:run/cancel` · `POST /v1/runs/:run/replay` | Cancelar o repetir una corrida. |

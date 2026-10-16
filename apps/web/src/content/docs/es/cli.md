@@ -55,7 +55,9 @@ eq run --file store-api.eq.json --env staging \
 - `--base-url` sustituye la URL del entorno: el mismo archivo sirve para cada rama o despliegue.
 - Las credenciales llegan por flags o variables (`EQ_TOKEN`, `EQ_READ_TOKEN`, `EQ_API_KEY`),
   nunca desde el archivo: el `.eq.json` se versiona sin secretos.
-- `--junit` escribe un reporte JUnit XML. `--json` guarda la corrida completa.
+- `--junit` escribe un reporte JUnit XML, `--html` una página autocontenida para compartir y
+  `--sarif` un archivo SARIF para el escaneo de código (ver "Informes para compartir" más abajo).
+  `--json` guarda la corrida completa.
 
 | Opción | Qué hace |
 |---|---|
@@ -72,6 +74,8 @@ eq run --file store-api.eq.json --env staging \
 | `--locale es\|en` | Idioma de los nombres de los casos (por defecto `en`). |
 | `--scope "nombre"` | Un nombre para la corrida en el historial y en el reporte. |
 | `--junit archivo.xml` · `--json archivo.json` | Reportes. |
+| `--html informe.html` · `--sarif informe.sarif` | Informes para compartir: una página HTML, SARIF 2.1.0. Combinables con `--junit`. |
+| `--contract <archivo>` | El archivo del contrato al que apuntan los resultados SARIF (por defecto, el de `--file`). |
 | `--format text\|json` · `-q, --quiet` | Qué se imprime: texto (por defecto), JSON o nada. |
 | `--fail-on-blocked` | Sale con `1` si el entorno bloqueó escrituras. |
 
@@ -104,13 +108,28 @@ lee de `EQ_API_URL`.
 ```yaml
 - uses: actions/setup-node@v4
   with: { node-version: 22 }
-- run: npx endpoint-quality run --file store-api.eq.json --env staging --base-url ${{ vars.STAGING_URL }} --junit eq-report.xml
+- run: >-
+    npx endpoint-quality run --file store-api.eq.json --env staging --base-url ${{ vars.STAGING_URL }}
+    --junit eq-report.xml --html eq-report.html --sarif eq-report.sarif --contract openapi.yaml
   env:
     EQ_TOKEN: ${{ secrets.STAGING_TOKEN }}
+# Los casos fallidos como alertas de code scanning, junto al contrato (necesita `security-events: write`).
+- uses: github/codeql-action/upload-sarif@v3
+  if: always()
+  with:
+    sarif_file: eq-report.sarif
+    category: endpoint-quality
+# La página HTML y el JUnit, adjuntos a la ejecución del workflow.
 - uses: actions/upload-artifact@v4
   if: always()
-  with: { name: eq-report, path: eq-report.xml }
+  with:
+    name: eq-report
+    path: |
+      eq-report.html
+      eq-report.xml
 ```
+
+El job necesita `permissions: { contents: read, security-events: write }` para subir el SARIF.
 
 ### Otras CI
 
@@ -147,6 +166,40 @@ Azure DevOps:
   inputs: { testResultsFormat: JUnit, testResultsFiles: eq-report.xml }
 ```
 
+## Informes para compartir
+
+Una corrida terminada se puede escribir como tres tipos de archivo, desde la CLI o desde la app:
+
+- **HTML** (`--html informe.html`): una sola página autocontenida — estilos y el pequeño script
+  en línea, ninguna petición a ningún sitio, clara u oscura según el sistema de quien la lee,
+  imprimible. Primero el resumen (veredicto, totales, duraciones, entorno, versión del contrato),
+  luego los fallos con cada solicitud, respuesta y aserción, y al final una tabla filtrable con
+  todos los casos. Una prueba de carga muestra sus percentiles y los criterios de su veredicto.
+- **SARIF 2.1.0** (`--sarif informe.sarif`): cada caso fallido es un resultado cuya regla es el
+  tipo de escenario (`not-found`, `auth-none`, `create-read`…), con nivel `error` —`warning`
+  cuando solo falló el presupuesto de latencia—, ubicado en la operación (`GET /orders/{id}`).
+  Si se conoce el archivo del contrato (`--file`, o `--contract openapi.yaml`), el resultado
+  apunta además a la línea que declara la operación, y GitHub muestra la alerta junto al
+  contrato. Los casos bloqueados no son resultados.
+- **JUnit XML** (`--junit informe.xml`): ver arriba.
+
+Los secretos nunca llegan a un informe: los tokens que recibió la corrida, los miembros con
+nombre de credencial (`authorization`, `token`, `password`…), los valores `Bearer`/`Basic` y los
+parámetros de query con pinta de credencial se enmascaran como `••••••••`.
+
+Una corrida guardada se puede volver a generar con `eq report`:
+
+```bash
+# Una corrida guardada con --json: sin servidor.
+eq report run.json --format html -o informe.html
+# Una corrida de un API, por su id.
+eq report 01a144b9-f552-7092-9e12-ec62710a18f2 --format sarif -o informe.sarif --api http://eq.internal:4400
+```
+
+`--format` es `html` (por defecto), `sarif` o `junit`; sin `-o` se imprime por la salida estándar.
+El API responde lo mismo en `GET /v1/runs/{id}/report?format=html|sarif|junit`, y en la app la
+vista de la corrida tiene un menú **Descargar informe**.
+
 ## Pruebas de carga
 
 ```bash
@@ -156,7 +209,8 @@ eq load --file store-api.eq.json --env staging --type stress --rps 10 --peak 100
 `--type` es `load`, `stress`, `spike` o `soak`; `--mix` elige una mezcla del proyecto; `--p95` fija
 un límite propio (o `--no-latency` para no exigir latencia); `--preflight stop|skip|ignore` decide
 qué hacer con un objetivo que falla la verificación previa (por defecto `skip`). Sale con `1` si el
-veredicto falla. `--junit`, `--json` y `--format` funcionan igual que en `eq run`: el JUnit trae un
+veredicto falla. `--junit`, `--html`, `--sarif`, `--json` y `--format` funcionan igual que en
+`eq run` (SARIF trae un resultado por criterio fallido): el JUnit trae un
 test por criterio del veredicto. Contra un entorno compartido, coordínalo con el equipo.
 
 Como compuerta en CI, una prueba corta a la tasa esperada con un p95 propio:

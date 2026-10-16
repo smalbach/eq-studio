@@ -5,6 +5,7 @@
  *   eq run <project> --env <e>   a functional run; exit code 0/1 for CI
  *   eq run --file p.eq.json      the same, without any server running
  *   eq load …                    a load, stress, spike or soak test
+ *   eq report <run|file>         a stored run as HTML, SARIF or JUnit
  *   eq mock                      the example API the Mock Store project runs against
  *   eq diff <old> <new>          what changed between two contracts; exit 1 if it breaks clients
  *   eq projects | export | import
@@ -12,7 +13,7 @@
  */
 import { parseArgs } from "node:util";
 import { CliError, EXIT } from "./client.ts";
-import { diff, exportProject, importProject, load, mock, projects, run, serve, type Flags } from "./commands.ts";
+import { diff, exportProject, importProject, load, mock, projects, report, run, serve, type Flags } from "./commands.ts";
 import { red } from "./report.ts";
 import { login, logout, sync } from "./sync.ts";
 import { VERSION } from "./runtime.ts";
@@ -42,6 +43,9 @@ Usage
         --api-key K            alternate API key               (or EQ_API_KEY; --api-key-header)
         --samples N --delay MS --locale en|es --scope "name"
         --junit report.xml     JUnit XML for the CI's test view
+        --html report.html     one self-contained HTML page to share (secrets masked)
+        --sarif report.sarif   SARIF 2.1.0 for code scanning (GitHub upload-sarif)
+        --contract openapi.yaml  the contract file SARIF results point at (default --file)
         --json run.json        the full run as JSON
         --format text|json     what is printed (default text)
         -q, --quiet            no progress, only the result
@@ -50,7 +54,12 @@ Usage
   eq load <project> --env <environment> [--type load|stress|spike|soak] [--rps 10] [--peak 50]
           [--duration 30] [--mix <id>] [--p95 <ms>] [--no-latency] [--preflight stop|skip|ignore]
       A load test (also with --file and --base-url). Exit 1 when its verdict fails.
-      --junit, --json, --format and --locale work as for eq run (one JUnit case per criterion).
+      --junit, --html, --sarif, --json, --format and --locale work as for eq run (one JUnit case
+      and one SARIF result per criterion).
+
+  eq report <run-id | run.json> [--format html|sarif|junit] [-o file] [--locale en|es]
+      A stored run as a report: a run id from the API at --api, or a file written by --json
+      (no server needed). Default html, to stdout without -o.
 
   eq mock [--port 4010]             the example API (a fictional store) for the Mock Store project:
                                     no auth on 4010, with auth on 4011 (Bearer admin-token)
@@ -98,7 +107,7 @@ export async function main(argv: string[]): Promise<number> {
       samples: { type: "string" }, delay: { type: "string" }, locale: { type: "string" }, scope: { type: "string" },
       junit: { type: "string" }, json: { type: "string" }, format: { type: "string" }, quiet: { type: "boolean", short: "q" }, "fail-on-blocked": { type: "boolean" },
       type: { type: "string" }, rps: { type: "string" }, peak: { type: "string" }, duration: { type: "string" }, mix: { type: "string" }, p95: { type: "string" }, "no-latency": { type: "boolean" }, preflight: { type: "string" },
-      output: { type: "string", short: "o" },
+      output: { type: "string", short: "o" }, html: { type: "string" }, sarif: { type: "string" }, contract: { type: "string" }, project: { type: "string" },
       name: { type: "string" }, "no-open": { type: "boolean" }, status: { type: "boolean" }, runs: { type: "string" }, projects: { type: "string" }, secrets: { type: "string" },
     },
   });
@@ -111,6 +120,7 @@ export async function main(argv: string[]): Promise<number> {
     case "run": return run(argument, flags);
     case "load": return load(argument, flags);
     case "diff": return diff(argument, second, flags);
+    case "report": return report(argument, flags);
     case "projects": return projects(flags);
     case "mock": return mock(flags);
     case "export": return exportProject(argument, flags);
