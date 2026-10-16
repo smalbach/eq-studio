@@ -9,6 +9,7 @@
 import { app, BrowserWindow, dialog, nativeTheme, shell } from "electron";
 import { startServer, type Server } from "../../cli/src/server.ts";
 import { DATA_DIR } from "../../cli/src/runtime.ts";
+import { checkForUpdates } from "./updates.ts";
 
 const HOST = "127.0.0.1";
 /** The port `eq serve` uses: the same origin keeps the web app's preferences (language, theme). */
@@ -89,6 +90,7 @@ if (!app.requestSingleInstanceLock()) {
   app.whenReady().then(async () => {
     origin = await start();
     createWindow();
+    checkForUpdates();
     // macOS keeps the app (and its API) alive with no window; the Dock icon opens a new one.
     app.on("activate", () => { if (!window) createWindow(); });
   }).catch((error: unknown) => {

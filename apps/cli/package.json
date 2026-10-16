@@ -3,6 +3,15 @@
   "version": "0.1.0",
   "description": "Endpoint Quality: functional, load and stress verification of any HTTP API against its OpenAPI contract. The app, the API and the `eq` command line in one package.",
   "license": "MIT",
+  "homepage": "https://github.com/smalbach/eq-studio#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/smalbach/eq-studio.git",
+    "directory": "apps/cli"
+  },
+  "bugs": {
+    "url": "https://github.com/smalbach/eq-studio/issues"
+  },
   "type": "module",
   "bin": {
     "eq": "./bin/eq.mjs",

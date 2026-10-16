@@ -2,15 +2,12 @@
  * Reading a Postman environment export (`*.postman_environment.json`) into the dashboard's
  * connection fields.
  *
- * `make postman` already emits one environment per `servers[]` entry of the contract — local,
- * staging and production — and until now the dashboard ignored them: the base URL and the
- * credentials were typed by hand, so pointing the matrix at staging meant copying a host from a
- * file the repository already versions, and a typo there fails 46 operations for a reason that
- * has nothing to do with the API.
+ * Many APIs already keep one Postman environment per server (local, staging, production).
+ * Importing it fills the base URL and the credentials instead of typing them by hand, where a
+ * typo in the host fails every operation for a reason that has nothing to do with the API.
  *
- * It takes no React on purpose, the same way `execution-plan.mjs`-style logic does elsewhere:
- * the mapping is what can be wrong, and it is asserted in `tests/postman-environment.test.mjs`
- * without a browser.
+ * It takes no React on purpose: the mapping is what can be wrong, and it can be tested without
+ * a browser.
  */
 import { tr } from "./i18n-core.mjs";
 
@@ -19,7 +16,7 @@ import { tr } from "./i18n-core.mjs";
  *
  * Normalization drops case and the `-`/`_`/space separators, so `access_token`, `accessToken`
  * and `ACCESS TOKEN` are the same variable. Postman itself imposes no naming, and the
- * environments of a gateway team are not going to match ours letter by letter.
+ * environments someone else wrote are not going to match these keys letter by letter.
  */
 const FIELD_BY_KEY = {
   baseurl: "baseUrl",
@@ -70,11 +67,10 @@ function readPostmanJson(source, locale = "es") {
 /**
  * Maps the enabled variables onto the dashboard fields.
  *
- * **An empty value never overwrites.** The versioned environments ship `client_secret`,
- * `access_token` and `api_key` empty and marked `type: secret` — secrets live in Secret Manager
- * and there is a test in the back-end that fails if one is ever committed. Importing `local` to
- * switch the host would otherwise wipe the token that was just pasted in, and every 401 after it
- * would look like the API's fault.
+ * **An empty value never overwrites.** Versioned environments usually ship `client_secret`,
+ * `access_token` and `api_key` empty and marked `type: secret`, because secrets are kept out of
+ * the repository. Importing `local` to switch the host would otherwise wipe the token that was
+ * just pasted in, and every 401 after it would look like the API's fault.
  */
 export function mapEnvironmentValues(values) {
   const fields = {};
@@ -102,13 +98,13 @@ export function mapEnvironmentValues(values) {
  * Parses one Postman environment export.
  *
  * Throws with a message meant for the panel — the two mistakes worth naming are dropping a
- * collection in (the file next to the environments, 180 kB, and the one a reader reaches for
+ * collection in (often the file next to the environments, and the one a reader reaches for
  * first) and a file with no variables at all.
  */
 export function parsePostmanEnvironment(source, fallbackName = "Entorno importado", locale = "es") {
   const document = readPostmanJson(source, locale);
   if (!document || typeof document !== "object" || Array.isArray(document)) throw new Error(tr(locale, "El archivo no contiene un objeto JSON.", "The file does not contain a JSON object."));
-  if (Array.isArray(document.item) || document.info) throw new Error(tr(locale, "Eso es una colección de Postman, no un entorno. Importa un archivo de postman/environments/.", "That is a Postman collection, not an environment. Import a file from postman/environments/."));
+  if (Array.isArray(document.item) || document.info) throw new Error(tr(locale, "Eso es una colección de Postman, no un entorno. Importa un archivo `*.postman_environment.json`.", "That is a Postman collection, not an environment. Import a `*.postman_environment.json` file."));
   if (!Array.isArray(document.values)) throw new Error(tr(locale, "No parece un entorno de Postman: falta el arreglo `values`.", "Does not look like a Postman environment: the `values` array is missing."));
   const scope = document._postman_variable_scope;
   if (scope && scope !== "environment") throw new Error(tr(locale, `El archivo declara scope \`${scope}\`, y el dashboard solo aplica entornos.`, `The file declares scope \`${scope}\`, and the dashboard only applies environments.`));

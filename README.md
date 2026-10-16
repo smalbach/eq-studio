@@ -1,5 +1,14 @@
 # Endpoint Quality
 
+[![CI](https://github.com/smalbach/eq-studio/actions/workflows/ci.yml/badge.svg)](https://github.com/smalbach/eq-studio/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
+> **English:** Endpoint Quality checks any HTTP API against its OpenAPI contract — status, schema,
+> auth (401/403), persistence of writes and chained flows — and runs load, stress, spike and soak
+> tests. Web app, desktop app, `eq` CLI for CI, and a cloud mode for teams with sync between
+> machines. [Read the English summary](#english) · [Contributing](CONTRIBUTING.md) ·
+> [Security](SECURITY.md)
+
 Verificación de cualquier API HTTP contra su contrato OpenAPI: **funcional** (status, schema,
 autenticación, persistencia real de lo escrito, flujos encadenados que limpian lo que crean),
 **carga**, **estrés**, **pico** y **resistencia**.
@@ -182,6 +191,15 @@ pnpm run binary     # apps/cli/build: el ejecutable de este sistema operativo
 pnpm desktop:dist   # apps/desktop/release: el instalador de escritorio de este sistema
 ```
 
+## Contribuir
+
+Las contribuciones son bienvenidas, en español o en inglés: lee [CONTRIBUTING.md](CONTRIBUTING.md)
+(entorno, comprobaciones, documentación bilingüe) y el [Código de conducta](CODE_OF_CONDUCT.md).
+Los cambios se anotan en [CHANGELOG.md](CHANGELOG.md). Las vulnerabilidades se reportan en
+privado según [SECURITY.md](SECURITY.md), nunca en un issue público.
+
+Licencia [MIT](LICENSE).
+
 ---
 
 ## English
@@ -238,6 +256,12 @@ with SSRF guards. See the in-app docs (Cloud deployment) and [`apps/api`](apps/a
 `eq login <url>` and `eq sync` (or Settings → Sync) link a local installation to a cloud workspace:
 field-by-field merges, visible conflicts, and secrets that stay on each machine unless a passphrase
 encrypts them end to end.
+
+### Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) (setup, checks, bilingual docs), the
+[Code of Conduct](CODE_OF_CONDUCT.md) and [CHANGELOG.md](CHANGELOG.md). Report vulnerabilities
+privately as described in [SECURITY.md](SECURITY.md).
 
 ### Where data lives
 

@@ -28,3 +28,11 @@ linux:
   category: Development
   target: [AppImage, deb]
   maintainer: Endpoint Quality <noreply@endpointquality.dev>
+# Update checks (src/updates.ts) read latest*.yml from the GitHub release; the release workflow
+# uploads them next to the installers. On macOS updates are only announced: installing them in
+# place needs a Developer ID signature.
+publish:
+  provider: github
+  owner: smalbach
+  repo: eq-studio
+  releaseType: release

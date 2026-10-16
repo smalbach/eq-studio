@@ -72,15 +72,22 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm run desktop:dist
+      # Both macOS jobs write latest-mac.yml: the release job merges them (merge-latest-mac.mjs).
+      - name: Name the macOS update metadata after its architecture
+        if: runner.os == 'macOS'
+        run: mv apps/desktop/release/latest-mac.yml apps/desktop/release/latest-mac-${{ matrix.name }}.yml
       - uses: actions/upload-artifact@v4
         with:
           name: desktop-${{ matrix.name }}
+          # latest*.yml and the blockmaps are what the app's update check reads.
           path: |
             apps/desktop/release/*.dmg
             apps/desktop/release/*.zip
             apps/desktop/release/*.exe
             apps/desktop/release/*.AppImage
             apps/desktop/release/*.deb
+            apps/desktop/release/*.blockmap
+            apps/desktop/release/latest*.yml
           if-no-files-found: error
 
   package:
@@ -114,10 +121,12 @@ jobs:
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
           path: artifacts
           merge-multiple: true
+      - run: node apps/desktop/scripts/merge-latest-mac.mjs artifacts
       - uses: softprops/action-gh-release@v2
         with:
           files: artifacts/*

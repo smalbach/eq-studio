@@ -36,6 +36,24 @@ WebAssembly) y empaqueta `src/main.ts` con las mismas opciones de esbuild
 (`apps/cli/scripts/esbuild-shared.mjs`); `--reuse` se salta el bundle de la CLI si ya existe.
 `electron-builder.yml` define los instaladores. No hay módulos nativos: todo va en `dist/`.
 
+## Actualizaciones
+
+Al arrancar, la app instalada consulta una vez la última release de GitHub
+(`publish` en `electron-builder.yml`, `src/updates.ts`). Nunca en desarrollo (`pnpm desktop`) ni
+con `EQ_NO_UPDATE_CHECK=1`. Si hay una versión nueva, avisa con una notificación del sistema, sin
+diálogos ni interrupciones:
+
+- **Windows** y **Linux** (`.AppImage`, `.deb`): la descarga en segundo plano y la instala al
+  cerrar la app.
+- **macOS**: solo avisa; la notificación abre la página de la release. Squirrel.Mac solo instala
+  actualizaciones firmadas con un Developer ID, y la build se firma ad hoc (ver Firma). Con un
+  Developer ID, la actualización en sitio funciona sin más cambios que quitar esa excepción en
+  `src/updates.ts`.
+
+La release publica junto a los instaladores los `latest*.yml` y los `.blockmap` que lee la
+consulta; los dos `latest-mac.yml` (arm64 y x64) se combinan en uno
+(`scripts/merge-latest-mac.mjs`).
+
 ## Firma
 
 - **macOS**: firma ad hoc, suficiente para ejecutarla en el equipo donde se construye. Un `.dmg`

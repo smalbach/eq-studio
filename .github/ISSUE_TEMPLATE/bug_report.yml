@@ -1,0 +1,47 @@
+name: Bug report
+description: Something does not work as documented. / Algo no funciona como dice la documentación.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. English or Spanish are both fine. **Security issues go through
+        [a private report](https://github.com/smalbach/eq-studio/security/advisories/new), not here.**
+        Never paste tokens, passwords or private hosts.
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Where
+      options: [Web app, Desktop app, CLI (eq), API in local mode, API in cloud mode, Sync, Other]
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: "`eq --version`, the desktop app version, or the commit."
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: Operating system and Node version
+      placeholder: macOS 15 arm64, Node 22.18
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Ideally against the bundled example API (`eq mock`) or a minimal OpenAPI document.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected and actual behaviour
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or output
+      render: text
