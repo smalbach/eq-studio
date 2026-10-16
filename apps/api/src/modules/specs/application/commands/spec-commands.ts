@@ -1,6 +1,7 @@
 import { Inject } from "@nestjs/common";
 import { CommandHandler, EventBus, type ICommandHandler } from "@nestjs/cqrs";
 import type { DataSource } from "typeorm";
+import type { ContractFormat } from "@eq/runner-core";
 import { isoNow } from "../../../../shared/ids.ts";
 import { DATA_SOURCE } from "../../../../shared/tokens.ts";
 import { ProjectRepository } from "../../../projects/infrastructure/project.repository.ts";
@@ -9,7 +10,7 @@ import { SpecVersionRepository } from "../../infrastructure/spec-version.reposit
 import { SpecImporter, type SpecSource } from "../spec-importer.ts";
 
 export class ImportSpecVersionCommand { constructor(readonly workspaceId: string, readonly projectId: string, readonly source: SpecSource, readonly activate = true) {} }
-export type ImportSpecVersionResult = { id: string; created: boolean; active: boolean; operationCount: number; warnings: string[] };
+export type ImportSpecVersionResult = { id: string; created: boolean; active: boolean; operationCount: number; warnings: string[]; sourceFormat: ContractFormat };
 
 /**
  * A new snapshot of the contract. The document is read before the transaction opens; the same
@@ -40,7 +41,7 @@ export class ImportSpecVersionHandler implements ICommandHandler<ImportSpecVersi
         await this.projects.save(project, tx);
         published.push(new SpecVersionActivated(workspaceId, project.id, version.id));
       }
-      return { id: version.id, created, active: project.activeSpecVersionId === version.id, operationCount: version.operationCount, warnings: parsed.warnings };
+      return { id: version.id, created, active: project.activeSpecVersionId === version.id, operationCount: version.operationCount, warnings: parsed.warnings, sourceFormat: parsed.sourceFormat };
     });
     this.events.publishAll(published);
     return result;

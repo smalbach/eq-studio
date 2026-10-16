@@ -9,12 +9,12 @@ In local mode the API listens on `http://127.0.0.1:4400`, on the loopback only a
 | Method and path | What it does |
 | --- | --- |
 | `GET /health` | Status, mode and database engine. |
-| `GET /v1/projects` · `POST /v1/projects` | Lists or creates projects (with `spec: { url }` or `spec: { document }` and `environments`). |
+| `GET /v1/projects` · `POST /v1/projects` | Lists or creates projects (with `spec: { url }` or `spec: { document }` and `environments`). Creating one answers `sourceFormat` and `baseUrl`: the contract's format and where it says the API runs. |
 | `POST /v1/projects/import` | Creates a project from a `.eq.json` (`{ file, slug? }`). |
 | `GET/PATCH/DELETE /v1/projects/:project` | The project; change `name` or `slug` (`expectedRev`); archive it. |
 | `GET /v1/projects/:project/export` | The project's `.eq.json`. |
 | `GET /v1/examples` · `GET /v1/examples/:id` · `POST /v1/examples/:id/import` | The bundled example projects; import one as a project. |
-| `GET/POST /v1/projects/:project/spec-versions` | Contract versions; import a new one (`{ source: { url } \| { document }, activate? }`). |
+| `GET/POST /v1/projects/:project/spec-versions` | Contract versions; import a new one (`{ source: { url } \| { document }, activate? }`). The document may be OpenAPI 3.x, Swagger 2.0 or a Postman collection: it is stored converted to OpenAPI 3 and the answer gives the original format in `sourceFormat` (`openapi`, `swagger`, `postman`). |
 | `POST /v1/projects/:project/spec-versions/:version/activate` | Goes back to another contract version. |
 | `GET /v1/projects/:project/operations` | Operations of the active version. |
 | `GET /v1/projects/:project/config` | The configuration and its `rev`. |

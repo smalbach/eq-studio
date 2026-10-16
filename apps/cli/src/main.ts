@@ -56,7 +56,11 @@ Usage
 
   eq projects [--format json]       the projects of the API
   eq export <project> [-o file]     a project as a .eq.json file
-  eq import <file.eq.json>          a .eq.json file as a new project
+  eq import <file> [--name N] [--base-url URL] [--env file.postman_environment.json]
+      A new project from a .eq.json file, or from a contract: OpenAPI 3.0/3.1, Swagger 2.0
+      (converted to OpenAPI 3) in JSON or YAML, or a Postman collection v2.x (an OpenAPI 3 is
+      generated from its requests; schemas are inferred from its examples). The first environment
+      gets the contract's base URL, --base-url, or the one --env resolves {{baseUrl}} to.
 
   eq login <cloud-url> [--name "Work laptop"] [--no-open] [--token eqt_…]
       Links this installation to a cloud workspace: it shows a code to approve in the browser

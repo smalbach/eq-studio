@@ -91,7 +91,7 @@ Builds the app and serves it from the API itself at `http://127.0.0.1:4400`: one
 
 Each project is one API: its contract, environments, credentials and runs. Keep as many as you want in the same installation. The home screen, **Projects**, lists them with a search and an order (recent or by name).
 
-1. **Projects → New project** opens the guide from scratch. **Projects → Import** creates one in one go from an OpenAPI contract (URL, file or pasted) or an `.eq.json`.
+1. **Projects → New project** opens the guide from scratch. **Projects → Import** creates one in one go from a contract —OpenAPI 3.0/3.1, Swagger 2.0 or a Postman collection— (URL, file or pasted) or an `.eq.json`. See [accepted formats](doc:conceptos).
 2. The new project opens on its **Dashboard**: contract, latest functional run and latest load test.
 3. To switch, go back to **Projects** (the first menu entry, or **Project → Switch project** in the header) and press **Enter** on another one.
 

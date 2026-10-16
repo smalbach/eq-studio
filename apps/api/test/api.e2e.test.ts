@@ -4,6 +4,7 @@ import { after, before, describe, test } from "node:test";
 import { databases, start, type Harness } from "./helpers.ts";
 
 const example = JSON.parse(readFileSync(new URL("../../../examples/mock-store/mock-store.eq.json", import.meta.url), "utf8"));
+const fixture = (name: string) => JSON.parse(readFileSync(new URL(`../../../packages/runner-core/test/fixtures/${name}`, import.meta.url), "utf8"));
 
 for (const database of databases()) {
   describe(`API over ${database.name}`, () => {
@@ -147,11 +148,56 @@ for (const database of databases()) {
       assert.deepEqual(missing.body, { type: "about:blank", title: "Not Found", status: 404, detail: "Project nope not found" });
       const bad = await h.request("POST", "/v1/projects", {});
       assert.equal(bad.status, 422);
-      const swagger = await h.request("POST", "/v1/projects", { spec: { document: { swagger: "2.0" } } });
+      const swagger = await h.request("POST", "/v1/projects", { spec: { document: { swagger: "1.2" } } });
       assert.equal(swagger.status, 422);
-      assert.match(swagger.body.detail, /Swagger 2\.0/);
+      assert.match(swagger.body.detail, /only Swagger 2\.0/);
+      const unknown = await h.request("POST", "/v1/projects", { spec: { document: { hello: "world" } } });
+      assert.equal(unknown.status, 422);
+      assert.match(unknown.body.detail, /Not an OpenAPI 3, Swagger 2\.0 or Postman collection/);
       const projects = await h.request("GET", "/v1/projects");
       assert.equal(projects.body.length, 2, "nothing was half-created by the failed calls");
+    });
+
+    test("a Swagger 2.0 contract is converted on import, and the same file is the same version", async () => {
+      const created = await h.request("POST", "/v1/projects", { spec: { document: fixture("petstore.swagger2.json") } });
+      assert.equal(created.status, 201, JSON.stringify(created.body));
+      assert.equal(created.body.sourceFormat, "swagger");
+      assert.equal(created.body.baseUrl, "https://petstore.example.com/v2");
+      assert.ok(created.body.warnings.some((warning: string) => warning.includes("Swagger 2.0")));
+      const operations = await h.request("GET", `/v1/projects/${created.body.slug}/operations`);
+      assert.deepEqual(operations.body.map((operation: { id: string }) => operation.id), ["listPets", "createPet", "getPet", "deletePet", "uploadPhoto"]);
+      const versions = await h.request("GET", `/v1/projects/${created.body.slug}/spec-versions`);
+      assert.equal(versions.body[0].openapiVersion, "3.0.3");
+      const yaml = "swagger: '2.0'\ninfo: { title: Petstore, version: 1.2.0 }\npaths:\n  /pets:\n    get:\n      responses: { '200': { description: OK } }\n";
+      const again = await h.request("POST", `/v1/projects/${created.body.slug}/spec-versions`, { source: { document: fixture("petstore.swagger2.json") } });
+      assert.equal(again.body.created, false);
+      assert.equal(again.body.sourceFormat, "swagger");
+      const fromYaml = await h.request("POST", `/v1/projects/${created.body.slug}/spec-versions`, { source: { document: yaml }, activate: false });
+      assert.equal(fromYaml.status, 201, JSON.stringify(fromYaml.body));
+      assert.equal(fromYaml.body.operationCount, 1);
+    });
+
+    test("an OpenAPI 3.1 contract imports with its type arrays, examples and const", async () => {
+      const created = await h.request("POST", "/v1/projects", { spec: { document: fixture("store.openapi31.json") } });
+      assert.equal(created.status, 201, JSON.stringify(created.body));
+      assert.equal(created.body.sourceFormat, "openapi");
+      assert.deepEqual(created.body.warnings, []);
+      const project = await h.request("GET", `/v1/projects/${created.body.slug}`);
+      assert.deepEqual(project.body.file.project.bodies.createOrder, { body: { kind: "order", total: 12.5 } });
+      assert.equal(project.body.file.project.parameterSamples.limit[0].value, "10");
+    });
+
+    test("a Postman collection becomes a project with an inferred contract and its base URL", async () => {
+      const created = await h.request("POST", "/v1/projects", { spec: { document: fixture("store.postman_collection.json") }, environments: [{ name: "Staging", baseUrl: "https://staging.example.com" }] });
+      assert.equal(created.status, 201, JSON.stringify(created.body));
+      assert.equal(created.body.slug, "store-collection");
+      assert.equal(created.body.sourceFormat, "postman");
+      assert.equal(created.body.baseUrl, "http://127.0.0.1:4010");
+      assert.ok(created.body.warnings.some((warning: string) => warning.includes("inferred")));
+      const operations = await h.request("GET", "/v1/projects/store-collection/operations");
+      assert.deepEqual(operations.body.map((operation: { method: string; path: string }) => `${operation.method} ${operation.path}`), ["GET /health", "GET /v1/orders", "POST /v1/orders", "GET /v1/orders/{orderId}", "DELETE /v1/orders/{order_id}/items/{item_id}"]);
+      const project = await h.request("GET", "/v1/projects/store-collection");
+      assert.deepEqual(project.body.file.project.auth.publicOperations, ["health"]);
     });
   });
 }

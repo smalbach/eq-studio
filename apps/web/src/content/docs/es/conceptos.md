@@ -8,7 +8,17 @@ Una API que quieres verificar. Guarda su contrato, su configuración (qué proba
 
 ## Contrato y versión del contrato
 
-El documento **OpenAPI 3** de la API. Al importarlo se guarda una **versión**: una copia inmutable identificada por su hash. Importar el mismo contenido dos veces da la misma versión; importar uno nuevo crea otra y la activa. Las corridas usan siempre la versión activa, nunca un documento que cambie a mitad de camino.
+El contrato de la API: un documento **OpenAPI 3**, o uno que se convierte a OpenAPI 3 al importarlo (Swagger 2.0, una colección de Postman). Al importarlo se guarda una **versión**: una copia inmutable identificada por su hash. Importar el mismo contenido dos veces da la misma versión; importar uno nuevo crea otra y la activa. Las corridas usan siempre la versión activa, nunca un documento que cambie a mitad de camino.
+
+### Formatos aceptados
+
+| Formato | Qué se hace con él |
+| --- | --- |
+| **OpenAPI 3.0 y 3.1** (JSON o YAML) | Se usa tal cual. En 3.1 se validan los tipos con `null` (`type: [string, "null"]`), `const`, `examples`, `prefixItems`, `exclusiveMinimum` numérico, `patternProperties`, `if`/`then`/`else` y el resto de JSON Schema 2020-12 que usan las respuestas. |
+| **Swagger 2.0** (JSON o YAML) | Se **convierte a OpenAPI 3.0** al importarlo: `definitions` pasa a `components.schemas`, `host`/`basePath`/`schemes` a `servers`, los parámetros `body` y `formData` a `requestBody`, `produces`/`consumes` a `content`, y `securityDefinitions` a `securitySchemes`. La app avisa de que hubo conversión. |
+| **Colección de Postman v2.1** (y v2.0) | Se **genera un OpenAPI 3.0** desde sus solicitudes: método y ruta (`{{var}}` y `:var` pasan a parámetros de ruta), query, cabeceras, body JSON, carpetas como tags y las respuestas guardadas como status. Los **schemas se infieren de los ejemplos**, así que revísalos: un ejemplo no dice qué campos son opcionales. La URL base del primer entorno sale de la variable de la colección (`{{baseUrl}}`) o del entorno de Postman que elijas junto a ella. |
+
+Lo que se guarda como versión es el OpenAPI 3 resultante, y su hash es el de ese documento. La conversión es determinista: el mismo Swagger o la misma colección, importados dos veces, siguen siendo la misma versión.
 
 De cada operación del contrato se toma el método, la ruta, el tag, los **status declarados** y los **parámetros**. Un status declarado habilita sus casos: si tu API responde 409 pero el contrato no lo declara, nadie lo prueba.
 

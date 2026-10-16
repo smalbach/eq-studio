@@ -174,6 +174,16 @@ eq export store-api -o store-api.eq.json     # a project as a file
 eq import store-api.eq.json                  # a file as a new project
 ```
 
+`eq import` also creates a project from a contract: OpenAPI 3.0/3.1 or Swagger 2.0 (converted to
+OpenAPI 3), as JSON or YAML, or a Postman collection v2.1 (an OpenAPI 3 is generated with schemas
+inferred from its examples). The first environment gets the contract's base URL, `--base-url`, or
+the one a Postman environment passed with `--env` gives `{{baseUrl}}`:
+
+```bash
+eq import petstore-swagger.yaml --name "Petstore"
+eq import store.postman_collection.json --env staging.postman_environment.json
+```
+
 These commands talk to the API at `--api` (by default the local one, so `eq serve` must be
 running). Version the `.eq.json` next to your API's code: configuration changes get reviewed in
 the same pull request as the contract changes.

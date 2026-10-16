@@ -8,6 +8,7 @@
  */
 import { latencyAssertion, percentile } from "./budgets.mjs";
 import { responseSchema, validateJson } from "./contract.mjs";
+import { contractFormatOf, toOpenApi3 } from "./contract-formats.ts";
 import { tr } from "./i18n.mjs";
 import type { Budget, Locale } from "./types.ts";
 
@@ -80,7 +81,11 @@ async function loadSpec(fetchImpl: typeof fetch, url: URL, headers: Record<strin
   if (cached && Date.now() - cached.at < SPEC_TTL_MS) return cached.spec;
   const response = await fetchImpl(url, { headers: { Accept: "application/json", ...headers } });
   if (!response.ok) throw new Error(tr(locale, `${url.pathname} respondió ${response.status}`, `${url.pathname} answered ${response.status}`));
-  const spec = await response.json() as Record<string, unknown>;
+  const read = await response.json() as Record<string, unknown>;
+  // A project imported from Swagger 2.0 or a Postman collection keeps reading that document on
+  // each run: it is validated against the same OpenAPI 3 the import produced from it.
+  const format = contractFormatOf(read);
+  const spec = format === "swagger" || format === "postman" ? toOpenApi3(read).document : read;
   specCache.set(key, { at: Date.now(), spec });
   return spec;
 }
