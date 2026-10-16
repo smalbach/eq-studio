@@ -335,6 +335,18 @@ export const ApiTokenEntity = new EntitySchema<ApiTokenRow>({
   columns: { id, workspaceId: { ...ref, name: "workspace_id" }, kind: { type: "varchar", length: 20, default: "api" }, userId: { ...ref, name: "user_id", nullable: true }, name: { type: "varchar", length: 200 }, tokenHash: { type: "varchar", length: 64, name: "token_hash" }, prefix: { type: "varchar", length: 16 }, role: { type: "varchar", length: 20 }, createdBy: { ...ref, name: "created_by" }, lastUsedAt: { ...stamp, name: "last_used_at", nullable: true }, expiresAt: { ...stamp, name: "expires_at", nullable: true }, revokedAt: { ...stamp, name: "revoked_at", nullable: true }, createdAt: { ...stamp, name: "created_at" } },
 });
 
+export type AuditEventRow = { id: string; workspaceId: string; type: string; actorUserId: string | null; actorTokenId: string | null; actorLabel: string | null; targetType: string | null; targetId: string | null; targetLabel: string | null; detail: Record<string, unknown> | null; ip: string | null; createdAt: string };
+export type PasswordResetRow = { id: string; userId: string; tokenHash: string; createdBy: string | null; expiresAt: string; usedAt: string | null; createdAt: string };
+
+export const AuditEventEntity = new EntitySchema<AuditEventRow>({
+  name: "AuditEvent", tableName: "audit_events",
+  columns: { id, workspaceId: { ...ref, name: "workspace_id" }, type: { type: "varchar", length: 60 }, actorUserId: { ...ref, name: "actor_user_id", nullable: true }, actorTokenId: { ...ref, name: "actor_token_id", nullable: true }, actorLabel: { type: "varchar", length: 320, name: "actor_label", nullable: true }, targetType: { type: "varchar", length: 40, name: "target_type", nullable: true }, targetId: { type: "varchar", length: 120, name: "target_id", nullable: true }, targetLabel: { type: "varchar", length: 320, name: "target_label", nullable: true }, detail: { type: "simple-json", nullable: true }, ip: { type: "varchar", length: 64, nullable: true }, createdAt: { ...stamp, name: "created_at" } },
+});
+export const PasswordResetEntity = new EntitySchema<PasswordResetRow>({
+  name: "PasswordReset", tableName: "password_resets",
+  columns: { id, userId: { ...ref, name: "user_id" }, tokenHash: { type: "varchar", length: 64, name: "token_hash" }, createdBy: { ...ref, name: "created_by", nullable: true }, expiresAt: { ...stamp, name: "expires_at" }, usedAt: { ...stamp, name: "used_at", nullable: true }, createdAt: { ...stamp, name: "created_at" } },
+});
+
 export type SyncType = "spec" | "project" | "environment" | "credential" | "run";
 /** What the cloud keeps without reading it: end-to-end encrypted credentials, the key check. */
 export type SyncObjectRow = { id: string; workspaceId: string; type: string; data: Record<string, unknown>; rev: number; syncSeq: number; updatedAt: string };
@@ -387,4 +399,4 @@ export const DeviceCodeEntity = new EntitySchema<DeviceCodeRow>({
   columns: { id, deviceCodeHash: { type: "varchar", length: 64, name: "device_code_hash" }, userCode: { type: "varchar", length: 16, name: "user_code" }, name: { type: "varchar", length: 200 }, status: { type: "varchar", length: 20 }, workspaceId: { ...ref, name: "workspace_id", nullable: true }, userId: { ...ref, name: "user_id", nullable: true }, expiresAt: { ...stamp, name: "expires_at" }, createdAt: { ...stamp, name: "created_at" } },
 });
 
-export const ENTITIES = [SyncObjectEntity, SyncAliasEntity, SyncConflictEntity, SyncStateEntity, SyncLinkEntity, DeviceCodeEntity, UserEntity, MembershipEntity, InvitationEntity, RefreshTokenEntity, ApiTokenEntity, WorkspaceEntity, ProjectEntity, SpecVersionEntity, OperationEntity, EnvironmentEntity, RunEntity, RunCaseEntity, CredentialEntity];
+export const ENTITIES = [AuditEventEntity, PasswordResetEntity, SyncObjectEntity, SyncAliasEntity, SyncConflictEntity, SyncStateEntity, SyncLinkEntity, DeviceCodeEntity, UserEntity, MembershipEntity, InvitationEntity, RefreshTokenEntity, ApiTokenEntity, WorkspaceEntity, ProjectEntity, SpecVersionEntity, OperationEntity, EnvironmentEntity, RunEntity, RunCaseEntity, CredentialEntity];

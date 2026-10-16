@@ -19,6 +19,10 @@ import { CredentialsModule } from "./modules/credentials/credentials.module.ts";
 import { RunsModule } from "./modules/runs/runs.module.ts";
 import { AccountsModule } from "./modules/accounts/accounts.module.ts";
 import { SyncModule } from "./modules/sync/sync.module.ts";
+import { AuditModule } from "./modules/audit/audit.module.ts";
+import { MetricsModule } from "./modules/metrics/metrics.module.ts";
+import { Metrics } from "./modules/metrics/metrics.ts";
+import { requestContextMiddleware } from "./shared/request-context.ts";
 import { AuthGuard } from "./shared/auth.guard.ts";
 import { APP_GUARD } from "@nestjs/core";
 import { ProblemDetailsFilter } from "./shared/problem.filter.ts";
@@ -36,7 +40,7 @@ class ConfigHolder {
  * HTTP fetcher (a test can serve documents without a network). */
 export async function createApp(config: AppConfig, overrides: { specFetcher?: SpecFetcher } = {}) {
   @Module({
-    imports: [ConfigHolder.of(config), CqrsModule.forRoot(), DatabaseModule, PersistenceModule, ProjectsModule, SpecsModule, EnvironmentsModule, ProjectConfigModule, CredentialsModule, RunsModule, AccountsModule, SyncModule.forMode(config.mode)],
+    imports: [ConfigHolder.of(config), CqrsModule.forRoot(), DatabaseModule, PersistenceModule, ProjectsModule, SpecsModule, EnvironmentsModule, ProjectConfigModule, CredentialsModule, RunsModule, AccountsModule, SyncModule.forMode(config.mode), AuditModule, MetricsModule],
     controllers: [HealthController, ExamplesController],
     providers: [{ provide: APP_GUARD, useClass: AuthGuard }],
   })
@@ -52,6 +56,8 @@ export async function createApp(config: AppConfig, overrides: { specFetcher?: Sp
   app.useBodyParser("json", { limit: "6mb" });
   app.use(securityHeaders);
   if (config.network?.trustProxy) app.set("trust proxy", /^\d+$/.test(config.network.trustProxy) ? Number(config.network.trustProxy) : config.network.trustProxy);
+  if (config.metrics?.enabled) app.use(app.get(Metrics).middleware);
+  app.use(requestContextMiddleware);
   if (config.network?.corsOrigins.length) app.enableCors({ origin: config.network.corsOrigins, credentials: true });
   serveWebApp(app, config.webDir);
   app.useGlobalFilters(new ProblemDetailsFilter());
@@ -72,7 +78,7 @@ function serveWebApp(app: NestExpressApplication, directory: string | undefined)
   const inline = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((match) => `'sha256-${createHash("sha256").update(match[1]).digest("base64")}'`);
   const policy = ["default-src 'self'", `script-src 'self' ${inline.join(" ")}`, "style-src 'self' 'unsafe-inline'", "img-src 'self' data:", "font-src 'self' data:", "connect-src 'self'", "frame-ancestors 'none'", "base-uri 'self'", "form-action 'self'", "object-src 'none'"].join("; ");
   app.use((request: { method: string; path: string }, response: { setHeader(name: string, value: string): void; type(value: string): { send(body: string): void } }, next: () => void) => {
-    if (request.method !== "GET" || request.path.startsWith("/v1/") || request.path === "/health") return next();
+    if (request.method !== "GET" || request.path.startsWith("/v1/") || request.path === "/health" || request.path === "/metrics") return next();
     response.setHeader("Content-Security-Policy", policy);
     response.type("html").send(html);
   });

@@ -27,10 +27,11 @@ export function testConfig(database: DatabaseConfig, queue: AppConfig["queue"] =
   return { ...base, mode: "cloud", auth: { required: true, jwtSecret: randomBytes(48).toString("base64"), registration: cloud.registration ?? "invite", accessTtlSeconds: 900, refreshTtlDays: 30 }, network: { allowPrivateTargets: cloud.allowPrivateTargets, corsOrigins: [] } };
 }
 
-export async function start(database: DatabaseConfig, options: { auth?: boolean; queue?: AppConfig["queue"]; cloud?: { allowPrivateTargets: boolean; registration?: "open" | "invite" } } = {}): Promise<Harness> {
+export async function start(database: DatabaseConfig, options: { auth?: boolean; queue?: AppConfig["queue"]; cloud?: { allowPrivateTargets: boolean; registration?: "open" | "invite" }; configure?: (config: AppConfig) => AppConfig } = {}): Promise<Harness> {
   const mockServer = createMockServer({ auth: options.auth ?? false });
   const { url: mock } = await mockServer.listen(0);
-  const config = testConfig(database, options.queue, options.cloud);
+  const defaults = testConfig(database, options.queue, options.cloud);
+  const config = options.configure ? options.configure(defaults) : defaults;
   const app = await createApp(config);
   await app.listen(0, "127.0.0.1");
   const address = app.getHttpServer().address() as { port: number };

@@ -7,8 +7,9 @@ import { Initial1792000000000 } from "./migrations/0001-initial.ts";
 import { Runs1792100000000 } from "./migrations/0002-runs.ts";
 import { Accounts1792200000000 } from "./migrations/0003-accounts.ts";
 import { Sync1792300000000 } from "./migrations/0004-sync.ts";
+import { CloudOps1792450000000 } from "./migrations/0005-cloud-ops.ts";
 
-export const MIGRATIONS = [Initial1792000000000, Runs1792100000000, Accounts1792200000000, Sync1792300000000];
+export const MIGRATIONS = [Initial1792000000000, Runs1792100000000, Accounts1792200000000, Sync1792300000000, CloudOps1792450000000];
 
 /**
  * SQLite runs through sql.js — SQLite compiled to WebAssembly — so the local mode has no native

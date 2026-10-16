@@ -35,7 +35,21 @@ export type NetworkConfig = {
 };
 export type AppConfig = { mode: "local" | "cloud"; host: string; port: number; database: DatabaseConfig; secrets: SecretKeySource; queue: QueueConfig; examplesDir?: string; webDir?: string; auth?: AuthConfig; network?: NetworkConfig;
   /** Local mode, once linked to a cloud workspace: seconds between automatic syncs (0: only on demand). */
-  sync?: { intervalSeconds: number } };
+  sync?: { intervalSeconds: number };
+  /** The address people open, e.g. `https://eq.example.com`: the base of links sent by email and
+   * of the SSO redirect. Never taken from a request's Host header, which a client controls. */
+  publicUrl?: string;
+  /** `pnpm run cloud`: cloud mode on one machine, where an unsent email may be logged. */
+  devCloud?: boolean;
+  mail?: MailConfig;
+  metrics?: MetricsConfig;
+  oidc?: OidcConfig };
+
+/** SMTP, for every email the API sends. Without `url` nothing is sent. */
+export type MailConfig = { url: string | null; from: string };
+export type MetricsConfig = { enabled: boolean; token: string | null };
+/** Single sign-on with any OpenID Connect provider (authorization code + PKCE). */
+export type OidcConfig = { issuer: string; clientId: string; clientSecret: string | null; allowedDomains: string[]; name: string; scopes: string };
 
 /** The repository's `examples/` and the built web app, found relative to this file. */
 export const DEFAULT_EXAMPLES_DIR = fileURLToPath(new URL("../../../examples/", import.meta.url));
@@ -69,6 +83,16 @@ export function readConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     corsOrigins: (env.EQ_CORS_ORIGINS ?? "").split(",").map((origin) => origin.trim()).filter(Boolean),
     trustProxy: env.EQ_TRUST_PROXY,
   };
+  const publicUrl = env.EQ_PUBLIC_URL ? env.EQ_PUBLIC_URL.replace(/\/+$/, "") : undefined;
+  const mail: MailConfig = { url: env.EQ_SMTP_URL || null, from: env.EQ_MAIL_FROM || "Endpoint Quality <no-reply@localhost>" };
+  const metrics: MetricsConfig = { enabled: env.EQ_METRICS === "true", token: env.EQ_METRICS_TOKEN || null };
+  let oidc: OidcConfig | undefined;
+  if (env.EQ_OIDC_ISSUER) {
+    if (!env.EQ_OIDC_CLIENT_ID) throw new Error("EQ_OIDC_ISSUER needs EQ_OIDC_CLIENT_ID");
+    if (!publicUrl) throw new Error("EQ_OIDC_ISSUER needs EQ_PUBLIC_URL: the redirect URI is built from it");
+    oidc = { issuer: env.EQ_OIDC_ISSUER, clientId: env.EQ_OIDC_CLIENT_ID, clientSecret: env.EQ_OIDC_CLIENT_SECRET || null, allowedDomains: (env.EQ_OIDC_ALLOWED_DOMAINS ?? "").split(",").map((domain) => domain.trim().toLowerCase()).filter(Boolean), name: env.EQ_OIDC_NAME || "SSO", scopes: env.EQ_OIDC_SCOPES || "openid email profile" };
+  }
+  if (mode === "cloud" && mail.url && !publicUrl) throw new Error("EQ_SMTP_URL needs EQ_PUBLIC_URL: the links in the emails are built from it");
   const sync = { intervalSeconds: mode === "local" ? Math.max(0, Number(env.EQ_SYNC_INTERVAL_SECONDS ?? 300) || 0) : 0 };
-  return { sync, mode, port, host: env.EQ_HOST ?? (mode === "local" ? "127.0.0.1" : "0.0.0.0"), database, secrets, queue, examplesDir: env.EQ_EXAMPLES_DIR ?? DEFAULT_EXAMPLES_DIR, webDir: env.EQ_WEB_DIR ?? DEFAULT_WEB_DIR, auth, network };
+  return { sync, mode, port, host: env.EQ_HOST ?? (mode === "local" ? "127.0.0.1" : "0.0.0.0"), database, secrets, queue, examplesDir: env.EQ_EXAMPLES_DIR ?? DEFAULT_EXAMPLES_DIR, webDir: env.EQ_WEB_DIR ?? DEFAULT_WEB_DIR, auth, network, publicUrl, devCloud: mode === "cloud" && env.EQ_CLOUD_SQLITE === "true", mail, metrics, oidc };
 }

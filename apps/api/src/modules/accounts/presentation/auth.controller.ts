@@ -7,8 +7,9 @@ import { AccountOnly, CurrentUser, Public } from "../../../shared/rbac.ts";
 import { parse } from "../../../shared/zod.ts";
 import { AcceptInvitationCommand, ChangePasswordCommand, CreateWorkspaceCommand, LoginCommand, LogoutCommand, RefreshCommand, RegisterCommand, type Session } from "../application/accounts-commands.ts";
 import { MeQuery } from "../application/accounts-queries.ts";
+import { RequestPasswordResetCommand, ResetPasswordCommand } from "../application/password-reset.ts";
 
-type Request = { ip?: string; headers: Record<string, string | string[] | undefined>; secure?: boolean };
+export type Request = { ip?: string; headers: Record<string, string | string[] | undefined>; secure?: boolean };
 type Response = { cookie(name: string, value: string, options: Record<string, unknown>): void; clearCookie(name: string, options: Record<string, unknown>): void };
 
 const email = z.email().max(320);
@@ -19,19 +20,21 @@ const refresh = z.object({ refreshToken: z.string().optional(), workspace: z.str
 const accept = z.object({ token: z.string().min(10), password, name: z.string().min(1).max(200).optional() });
 const changePassword = z.object({ current: password, next: password });
 const workspace = z.object({ name: z.string().min(1).max(200) });
+const forgot = z.object({ email });
+const reset = z.object({ token: z.string().min(10).max(200), password });
 
 /**
  * The refresh token also travels as an httpOnly cookie, scoped to these routes: the browser app
  * keeps only the short access token in memory, and script cannot read the long-lived one. The
  * CLI and other clients use the token in the body.
  */
-const COOKIE = "eq_refresh";
-const cookieOptions = (request: Request) => ({ httpOnly: true, sameSite: "strict", secure: Boolean(request.secure) || request.headers["x-forwarded-proto"] === "https", path: "/v1/auth" });
+export const COOKIE = "eq_refresh";
+export const cookieOptions = (request: Request) => ({ httpOnly: true, sameSite: "strict", secure: Boolean(request.secure) || request.headers["x-forwarded-proto"] === "https", path: "/v1/auth" });
 
-function cookieOf(request: Request) {
+export function cookieOf(request: Request, name = COOKIE) {
   const header = request.headers.cookie;
   const value = Array.isArray(header) ? header.join(";") : header ?? "";
-  return value.split(";").map((part) => part.trim().split("=")).find(([name]) => name === COOKIE)?.[1];
+  return value.split(";").map((part) => part.trim().split("=")).find(([key]) => key === name)?.[1];
 }
 
 @Controller("v1/auth")
@@ -86,6 +89,30 @@ export class AuthController {
     this.limiter.check(`accept:${request.ip}`, 10);
     const input = parse(accept, body);
     return this.answer(await this.commands.execute(new AcceptInvitationCommand(input.token, input.password, input.name)), request, response);
+  }
+
+  /** Always 202, whether the email has an account or not. */
+  @Public()
+  @Post("password/forgot")
+  @HttpCode(202)
+  async forgot(@Req() request: Request, @Body() body: unknown) {
+    const input = parse(forgot, body);
+    this.limiter.check(`forgot:${request.ip}`, 5);
+    // Per address too, counted the same for unknown emails: the limit reveals nothing.
+    this.limiter.check(`forgot:${input.email.toLowerCase()}`, 3, 15 * 60_000);
+    await this.commands.execute(new RequestPasswordResetCommand(input.email));
+    return { status: "accepted" };
+  }
+
+  @Public()
+  @Post("password/reset")
+  @HttpCode(204)
+  async reset(@Req() request: Request, @Res({ passthrough: true }) response: Response, @Body() body: unknown) {
+    this.limiter.check(`reset:${request.ip}`, 10);
+    const input = parse(reset, body);
+    await this.commands.execute(new ResetPasswordCommand(input.token, input.password));
+    // Every session of the account was closed, this browser's included.
+    response.clearCookie(COOKIE, cookieOptions(request));
   }
 
   @AccountOnly()

@@ -8,14 +8,15 @@ import { isoNow, uuidv7 } from "../../../shared/ids.ts";
 import { rank, requireRole, type Actor } from "../../../shared/rbac.ts";
 import { APP_CONFIG } from "../../../shared/tokens.ts";
 import { AccountsRepository } from "../infrastructure/accounts.repository.ts";
+import { AuditLog } from "../../audit/audit-log.ts";
 
 export type Session = { accessToken: string; expiresIn: number; refreshToken: string; user: { id: string; email: string; name: string }; workspaces: { id: string; name: string; role: Role }[] };
 
-const days = (n: number) => new Date(Date.now() + n * 86_400_000).toISOString();
+export const days = (n: number) => new Date(Date.now() + n * 86_400_000).toISOString();
 const MIN_PASSWORD = 10;
 
 /** Issues the pair a sign-in answers with: a short access token and a rotating refresh token. */
-async function issueSession(accounts: AccountsRepository, config: AppConfig, user: UserRow, familyId = uuidv7(), workspaceId?: string): Promise<Session> {
+export async function issueSession(accounts: AccountsRepository, config: AppConfig, user: UserRow, familyId = uuidv7(), workspaceId?: string): Promise<Session> {
   const memberships = await accounts.membershipsOf(user.id);
   const workspaces = await Promise.all(memberships.map(async (membership) => ({ id: membership.workspaceId, name: (await accounts.workspace(membership.workspaceId))?.name ?? "", role: membership.role })));
   const auth = config.auth!;
@@ -24,7 +25,7 @@ async function issueSession(accounts: AccountsRepository, config: AppConfig, use
   return { accessToken: signAccessToken({ sub: user.id, ws: workspaceId ?? workspaces[0]?.id ?? null }, auth.jwtSecret, auth.accessTtlSeconds), expiresIn: auth.accessTtlSeconds, refreshToken, user: { id: user.id, email: user.email, name: user.name }, workspaces };
 }
 
-function checkPassword(password: string) {
+export function checkPassword(password: string) {
   if (password.length < MIN_PASSWORD) throw new Invalid(`The password needs at least ${MIN_PASSWORD} characters`);
 }
 
@@ -60,14 +61,20 @@ export class LoginCommand { constructor(readonly email: string, readonly passwor
 
 @CommandHandler(LoginCommand)
 export class LoginHandler implements ICommandHandler<LoginCommand, Session> {
-  constructor(@Inject(AccountsRepository) private readonly accounts: AccountsRepository, @Inject(APP_CONFIG) private readonly config: AppConfig) {}
+  constructor(@Inject(AccountsRepository) private readonly accounts: AccountsRepository, @Inject(APP_CONFIG) private readonly config: AppConfig, @Inject(AuditLog) private readonly audit: AuditLog) {}
 
   async execute({ email, password }: LoginCommand) {
     const user = await this.accounts.userByEmail(email);
     // The same answer, and the same work, whether the email exists or not.
     const valid = await verifyPassword(password, user?.passwordHash ?? "scrypt$32768$8$1$AAAAAAAAAAAAAAAAAAAAAA$AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA");
-    if (!user || !valid || user.status !== "active") throw new Unauthorized("Wrong email or password");
-    return issueSession(this.accounts, this.config, user);
+    if (!user || !valid || user.status !== "active") {
+      // An unknown email has no workspace to log it in; the rate limit still counts it.
+      if (user) await this.audit.record({ workspaceId: (await this.accounts.membershipsOf(user.id)).map((item) => item.workspaceId), type: "auth.sign_in.failed", actor: { userId: user.id }, detail: { method: "password", reason: valid ? "disabled" : "wrong_password" } });
+      throw new Unauthorized("Wrong email or password");
+    }
+    const session = await issueSession(this.accounts, this.config, user);
+    await this.audit.record({ workspaceId: session.workspaces.map((item) => item.id), type: "auth.sign_in.succeeded", actor: { userId: user.id }, detail: { method: "password" } });
+    return session;
   }
 }
 
@@ -114,7 +121,7 @@ export class ChangePasswordCommand { constructor(readonly userId: string, readon
 /** A new password closes every other session of the account. */
 @CommandHandler(ChangePasswordCommand)
 export class ChangePasswordHandler implements ICommandHandler<ChangePasswordCommand, void> {
-  constructor(@Inject(AccountsRepository) private readonly accounts: AccountsRepository) {}
+  constructor(@Inject(AccountsRepository) private readonly accounts: AccountsRepository, @Inject(AuditLog) private readonly audit: AuditLog) {}
 
   async execute({ userId, current, next }: ChangePasswordCommand) {
     const user = await this.accounts.userById(userId);
@@ -122,6 +129,7 @@ export class ChangePasswordHandler implements ICommandHandler<ChangePasswordComm
     checkPassword(next);
     await this.accounts.saveUser({ ...user, passwordHash: await hashPassword(next), updatedAt: isoNow() });
     await this.accounts.revokeUserTokens(user.id, isoNow());
+    await this.audit.record({ workspaceId: (await this.accounts.membershipsOf(user.id)).map((item) => item.workspaceId), type: "auth.password.changed", actor: { userId: user.id } });
   }
 }
 
@@ -147,13 +155,14 @@ export class InviteMemberCommand { constructor(readonly actor: Actor, readonly e
 /** An invitation link, valid for seven days. Nobody can invite into a role above their own. */
 @CommandHandler(InviteMemberCommand)
 export class InviteMemberHandler implements ICommandHandler<InviteMemberCommand, { id: string; token: string; expiresAt: string }> {
-  constructor(@Inject(AccountsRepository) private readonly accounts: AccountsRepository) {}
+  constructor(@Inject(AccountsRepository) private readonly accounts: AccountsRepository, @Inject(AuditLog) private readonly audit: AuditLog) {}
 
   async execute({ actor, email, role }: InviteMemberCommand) {
     if (rank(role) > rank(actor.role)) throw new Forbidden(`You cannot invite an ${role}: it is above your own role`);
     const token = randomToken("eqi");
     const row: InvitationRow = { id: uuidv7(), workspaceId: actor.workspaceId, email: email.toLowerCase(), role, tokenHash: sha256(token), expiresAt: days(7), acceptedAt: null, createdBy: actor.userId ?? actor.tokenId ?? "", createdAt: isoNow() };
     await this.accounts.saveInvitation(row);
+    await this.audit.record({ workspaceId: actor.workspaceId, type: "member.invited", actor, target: { type: "invitation", id: row.id, label: row.email }, detail: { role } });
     return { id: row.id, token, expiresAt: row.expiresAt };
   }
 }
@@ -166,7 +175,7 @@ export class AcceptInvitationCommand { constructor(readonly token: string, reado
  */
 @CommandHandler(AcceptInvitationCommand)
 export class AcceptInvitationHandler implements ICommandHandler<AcceptInvitationCommand, Session> {
-  constructor(@Inject(AccountsRepository) private readonly accounts: AccountsRepository, @Inject(APP_CONFIG) private readonly config: AppConfig) {}
+  constructor(@Inject(AccountsRepository) private readonly accounts: AccountsRepository, @Inject(APP_CONFIG) private readonly config: AppConfig, @Inject(AuditLog) private readonly audit: AuditLog) {}
 
   async execute({ token, password, name }: AcceptInvitationCommand) {
     const invitation = await this.accounts.invitationByHash(sha256(token));
@@ -185,6 +194,7 @@ export class AcceptInvitationHandler implements ICommandHandler<AcceptInvitation
       if (!existing) await this.accounts.saveMembership({ id: uuidv7(), workspaceId: invitation.workspaceId, userId: account.id, role: invitation.role, createdAt: now }, tx);
       await this.accounts.saveInvitation({ ...invitation, acceptedAt: now }, tx);
     });
+    await this.audit.record({ workspaceId: invitation.workspaceId, type: "member.joined", actor: { userId: account.id }, target: { type: "user", id: account.id, label: account.email }, detail: { role: invitation.role } });
     return issueSession(this.accounts, this.config, account, undefined, invitation.workspaceId);
   }
 }
@@ -194,7 +204,7 @@ export class ChangeRoleCommand { constructor(readonly actor: Actor, readonly use
 /** Only owners change roles, and a workspace never loses its last owner. */
 @CommandHandler(ChangeRoleCommand)
 export class ChangeRoleHandler implements ICommandHandler<ChangeRoleCommand, void> {
-  constructor(@Inject(AccountsRepository) private readonly accounts: AccountsRepository) {}
+  constructor(@Inject(AccountsRepository) private readonly accounts: AccountsRepository, @Inject(AuditLog) private readonly audit: AuditLog) {}
 
   async execute({ actor, userId, role }: ChangeRoleCommand) {
     requireRole(actor, "owner", "Changing a role");
@@ -202,6 +212,7 @@ export class ChangeRoleHandler implements ICommandHandler<ChangeRoleCommand, voi
     if (!membership) throw new NotFound(`Member ${userId}`);
     if (membership.role === "owner" && role !== "owner" && (await this.accounts.ownerCount(actor.workspaceId)) <= 1) throw new Conflict("The workspace needs at least one owner");
     await this.accounts.saveMembership({ ...membership, role });
+    await this.audit.record({ workspaceId: actor.workspaceId, type: "member.role_changed", actor, target: { type: "user", id: userId, label: (await this.accounts.userById(userId))?.email }, detail: { from: membership.role, to: role } });
   }
 }
 
@@ -210,7 +221,7 @@ export class RemoveMemberCommand { constructor(readonly actor: Actor, readonly u
 /** Admins remove members; only an owner removes an owner, and never the last one. */
 @CommandHandler(RemoveMemberCommand)
 export class RemoveMemberHandler implements ICommandHandler<RemoveMemberCommand, void> {
-  constructor(@Inject(AccountsRepository) private readonly accounts: AccountsRepository) {}
+  constructor(@Inject(AccountsRepository) private readonly accounts: AccountsRepository, @Inject(AuditLog) private readonly audit: AuditLog) {}
 
   async execute({ actor, userId }: RemoveMemberCommand) {
     const membership = await this.accounts.membership(actor.workspaceId, userId);
@@ -220,6 +231,7 @@ export class RemoveMemberHandler implements ICommandHandler<RemoveMemberCommand,
       if ((await this.accounts.ownerCount(actor.workspaceId)) <= 1) throw new Conflict("The workspace needs at least one owner");
     }
     await this.accounts.deleteMembership(membership.id);
+    await this.audit.record({ workspaceId: actor.workspaceId, type: "member.removed", actor, target: { type: "user", id: userId, label: (await this.accounts.userById(userId))?.email }, detail: { role: membership.role } });
   }
 }
 
@@ -231,7 +243,7 @@ export class IssueApiTokenCommand { constructor(readonly actor: Actor, readonly 
  */
 @CommandHandler(IssueApiTokenCommand)
 export class IssueApiTokenHandler implements ICommandHandler<IssueApiTokenCommand, { id: string; token: string }> {
-  constructor(@Inject(AccountsRepository) private readonly accounts: AccountsRepository) {}
+  constructor(@Inject(AccountsRepository) private readonly accounts: AccountsRepository, @Inject(AuditLog) private readonly audit: AuditLog) {}
 
   async execute({ actor, name, role, expiresInDays }: IssueApiTokenCommand) {
     if (rank(role) > rank(actor.role)) throw new Forbidden(`A token cannot have a role above yours (${actor.role})`);
@@ -239,6 +251,7 @@ export class IssueApiTokenHandler implements ICommandHandler<IssueApiTokenComman
     const token = randomToken("eqt");
     const row: ApiTokenRow = { id: uuidv7(), workspaceId: actor.workspaceId, name, tokenHash: sha256(token), prefix: token.slice(0, 12), role, createdBy: actor.userId ?? actor.tokenId ?? "", lastUsedAt: null, expiresAt: expiresInDays ? days(expiresInDays) : null, revokedAt: null, createdAt: isoNow() };
     await this.accounts.saveApiToken(row);
+    await this.audit.record({ workspaceId: actor.workspaceId, type: "api_token.created", actor, target: { type: "api_token", id: row.id, label: name }, detail: { role, prefix: row.prefix, expiresAt: row.expiresAt } });
     return { id: row.id, token };
   }
 }
@@ -247,12 +260,14 @@ export class RevokeApiTokenCommand { constructor(readonly actor: Actor, readonly
 
 @CommandHandler(RevokeApiTokenCommand)
 export class RevokeApiTokenHandler implements ICommandHandler<RevokeApiTokenCommand, void> {
-  constructor(@Inject(AccountsRepository) private readonly accounts: AccountsRepository) {}
+  constructor(@Inject(AccountsRepository) private readonly accounts: AccountsRepository, @Inject(AuditLog) private readonly audit: AuditLog) {}
 
   async execute({ actor, id }: RevokeApiTokenCommand) {
     const row = (await this.accounts.apiTokens(actor.workspaceId)).find((item) => item.id === id);
     if (!row) throw new NotFound(`API token ${id}`);
+    if (row.revokedAt) return;
     await this.accounts.saveApiToken({ ...row, revokedAt: isoNow() });
+    await this.audit.record({ workspaceId: actor.workspaceId, type: row.kind === "device" ? "device.unlinked" : "api_token.revoked", actor, target: { type: row.kind === "device" ? "device" : "api_token", id: row.id, label: row.name }, detail: { prefix: row.prefix } });
   }
 }
 

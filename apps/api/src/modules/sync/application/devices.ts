@@ -14,6 +14,7 @@ import { isoNow, uuidv7 } from "../../../shared/ids.ts";
 import type { Actor } from "../../../shared/rbac.ts";
 import { AccountsRepository } from "../../accounts/infrastructure/accounts.repository.ts";
 import { SyncStore } from "../infrastructure/sync.store.ts";
+import { AuditLog } from "../../audit/audit-log.ts";
 
 const LIFETIME_MS = 15 * 60_000;
 const INTERVAL_SECONDS = 3;
@@ -42,7 +43,7 @@ export class CollectDeviceTokenCommand { constructor(readonly deviceCode: string
 /** The device's poll: pending, gone, or — once — its token. */
 @CommandHandler(CollectDeviceTokenCommand)
 export class CollectDeviceTokenHandler implements ICommandHandler<CollectDeviceTokenCommand> {
-  constructor(@Inject(SyncStore) private readonly store: SyncStore, @Inject(AccountsRepository) private readonly accounts: AccountsRepository) {}
+  constructor(@Inject(SyncStore) private readonly store: SyncStore, @Inject(AccountsRepository) private readonly accounts: AccountsRepository, @Inject(AuditLog) private readonly audit: AuditLog) {}
 
   async execute({ deviceCode }: CollectDeviceTokenCommand): Promise<{ status: "pending" | "expired" | "denied" } | { status: "approved"; token: string; workspace: { id: string; name: string } }> {
     const row = await this.store.deviceCodeByHash(sha256(deviceCode));
@@ -55,6 +56,7 @@ export class CollectDeviceTokenHandler implements ICommandHandler<CollectDeviceT
     const token = randomToken("eqt");
     const tokenRow: ApiTokenRow = { id: uuidv7(), workspaceId: row.workspaceId!, kind: "device", userId: row.userId, name: `Device · ${row.name}`.slice(0, 200), tokenHash: sha256(token), prefix: token.slice(0, 12), role: membership.role, createdBy: row.userId!, lastUsedAt: null, expiresAt: null, revokedAt: null, createdAt: isoNow() };
     await this.accounts.saveApiToken(tokenRow);
+    await this.audit.record({ workspaceId: tokenRow.workspaceId, type: "device.linked", actor: { userId: row.userId! }, target: { type: "device", id: tokenRow.id, label: row.name }, detail: { prefix: tokenRow.prefix } });
     const workspace = await this.accounts.workspace(row.workspaceId!);
     return { status: "approved", token, workspace: { id: row.workspaceId!, name: workspace?.name ?? "" } };
   }
@@ -95,11 +97,13 @@ export class ForgetDeviceCommand { constructor(readonly actor: Actor) {} }
 /** A device unlinking itself revokes its own token. */
 @CommandHandler(ForgetDeviceCommand)
 export class ForgetDeviceHandler implements ICommandHandler<ForgetDeviceCommand, void> {
-  constructor(@Inject(AccountsRepository) private readonly accounts: AccountsRepository) {}
+  constructor(@Inject(AccountsRepository) private readonly accounts: AccountsRepository, @Inject(AuditLog) private readonly audit: AuditLog) {}
 
   async execute({ actor }: ForgetDeviceCommand) {
     if (!actor.tokenId) return;
     const row = (await this.accounts.apiTokens(actor.workspaceId)).find((item) => item.id === actor.tokenId);
-    if (row && !row.revokedAt) await this.accounts.saveApiToken({ ...row, revokedAt: isoNow() });
+    if (!row || row.revokedAt) return;
+    await this.accounts.saveApiToken({ ...row, revokedAt: isoNow() });
+    await this.audit.record({ workspaceId: actor.workspaceId, type: "device.unlinked", actor, target: { type: "device", id: row.id, label: row.name }, detail: { prefix: row.prefix } });
   }
 }

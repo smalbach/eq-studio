@@ -5,6 +5,7 @@ import { CurrentActor, Requires, ROLES, type Actor } from "../../../shared/rbac.
 import { Workspace } from "../../../shared/workspace.ts";
 import { parse } from "../../../shared/zod.ts";
 import { CancelInvitationCommand, ChangeRoleCommand, InviteMemberCommand, IssueApiTokenCommand, RemoveMemberCommand, RevokeApiTokenCommand } from "../application/accounts-commands.ts";
+import { CreateResetLinkCommand } from "../application/password-reset.ts";
 import { ApiTokensQuery, CurrentWorkspaceQuery, InvitationsQuery, MembersQuery } from "../application/accounts-queries.ts";
 
 const role = z.enum(ROLES as ["viewer", "editor", "admin", "owner"]);
@@ -39,6 +40,13 @@ export class WorkspaceController {
   @HttpCode(204)
   async remove(@CurrentActor() actor: Actor, @Param("user") user: string) {
     await this.commands.execute(new RemoveMemberCommand(actor, user));
+  }
+
+  /** A reset link for a member: emailed with SMTP, otherwise returned once (see the handler). */
+  @Requires("admin")
+  @Post("members/:user/password-reset")
+  passwordReset(@CurrentActor() actor: Actor, @Param("user") user: string) {
+    return this.commands.execute(new CreateResetLinkCommand(actor, user));
   }
 
   @Requires("admin")

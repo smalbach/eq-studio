@@ -14,7 +14,7 @@ for (const database of databases()) {
     test("health answers with the mode and the engine", async () => {
       const { status, body } = await h.request("GET", "/health");
       assert.equal(status, 200);
-      assert.deepEqual(body, { status: "ok", mode: "local", database: database.config().type, auth: "none", registration: "invite" });
+      assert.deepEqual(body, { status: "ok", mode: "local", database: database.config().type, auth: "none", registration: "invite", sso: null });
     });
 
     test("a project from its contract's URL: operations, generated config and an environment in one call", async () => {

@@ -53,6 +53,7 @@ export type CredentialRole = "primary" | "insufficient" | "alternate";
 export type CredentialKind = "bearer" | "api_key" | "basic" | "oauth2_client_credentials";
 export type CredentialView = { role: CredentialRole; kind: CredentialKind; headerName: string | null; username: string | null; tokenUrl: string | null; clientId: string | null; scope: string | null; lastFour: string | null; hasSecret: boolean; rev: number; updatedAt: string };
 export type SpecVersionView = { id: string; hash: string; sourceKind: string; sourceUrl: string | null; openapiVersion: string | null; title: string | null; version: string | null; operationCount: number; createdAt: string; active: boolean };
+export type AuditEvent = { id: string; type: string; actorUserId: string | null; actorTokenId: string | null; actorLabel: string | null; targetType: string | null; targetId: string | null; targetLabel: string | null; detail: Record<string, unknown> | null; ip: string | null; createdAt: string };
 export type ExampleView = { id: string; name: string; operations: number; environments: { id: string; name: string; baseUrl: string }[]; summary: string };
 
 export type RunStatus = "queued" | "running" | "cancelling" | "passed" | "failed" | "cancelled" | "interrupted" | "error";
@@ -110,7 +111,11 @@ export const API = {
   cancelRun: (runId: string) => api<{ status: string }>("POST", `/v1/runs/${runId}/cancel`),
   probe: (id: string, input: { environment: string; operationId: string; scenarioId: string; parameters?: Record<string, string>; body?: unknown; samples?: number; locale: "es" | "en" }) => api<{ ok: boolean; durationMs: number; steps: CaseResult[] }>("POST", `${project(id)}/probe`, input),
 
-  health: () => api<{ status: string; mode: "local" | "cloud"; auth: "none" | "required"; registration: "open" | "invite" }>("GET", "/health"),
+  health: () => api<{ status: string; mode: "local" | "cloud"; auth: "none" | "required"; registration: "open" | "invite"; sso?: { name: string } | null }>("GET", "/health"),
+  forgotPassword: (email: string) => api<{ status: string }>("POST", "/v1/auth/password/forgot", { email }),
+  resetPassword: (token: string, password: string) => api<null>("POST", "/v1/auth/password/reset", { token, password }),
+  memberResetLink: (userId: string) => api<{ sent: boolean; token: string | null; expiresAt: string }>("POST", `/v1/workspace/members/${userId}/password-reset`),
+  audit: (query: string) => api<{ items: AuditEvent[]; nextCursor: string | null }>("GET", `/v1/audit${query}`),
   login: (email: string, password: string) => api<import("@/lib/session").Session>("POST", "/v1/auth/login", { email, password }),
   register: (input: { email: string; password: string; name: string; workspace?: string }) => api<import("@/lib/session").Session>("POST", "/v1/auth/register", input),
   acceptInvitation: (token: string, password: string, name?: string) => api<import("@/lib/session").Session>("POST", "/v1/auth/accept-invitation", { token, password, name }),

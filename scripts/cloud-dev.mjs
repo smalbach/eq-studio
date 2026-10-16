@@ -41,6 +41,8 @@ const env = {
   EQ_HOST: "127.0.0.1",
   EQ_REGISTRATION: process.env.EQ_REGISTRATION ?? "open",
   EQ_ALLOW_PRIVATE_TARGETS: "true",
+  // Links (password resets, SSO) point here. Without EQ_SMTP_URL the reset link is logged as a warning.
+  EQ_PUBLIC_URL: process.env.EQ_PUBLIC_URL ?? `http://localhost:${port}`,
 };
 console.log(`Endpoint Quality cloud (development) on http://localhost:${port}. Data in ${dir}`);
 const api = spawn("pnpm", ["--filter", "@eq/api", "start"], { cwd: root, env, stdio: "inherit" });

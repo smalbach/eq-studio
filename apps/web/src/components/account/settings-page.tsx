@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Badge, Button, Callout, Code, IconButton, Link, Select, Table, TextField } from "@radix-ui/themes";
-import { Check, CircleAlert, CircleCheck, Copy, GitMerge, KeyRound, LogOut, Palette, Trash2, UserPlus, Users } from "lucide-react";
+import { Check, CircleAlert, CircleCheck, Copy, GitMerge, KeyRound, LifeBuoy, LogOut, Palette, Trash2, UserPlus, Users } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { AppearanceSettings } from "@/components/app/appearance";
 import { ConflictsList, useConflicts } from "@/components/account/conflicts-list";
 import { SyncCard } from "@/components/account/sync-card";
+import { AuditLogCard } from "@/components/account/audit-log";
 import { PageHeader, type Crumb } from "@/components/common/page-header";
 import { API, ApiError } from "@/lib/api";
 import { chooseWorkspace, signedIn, signOut, useSession } from "@/lib/session";
@@ -25,6 +26,8 @@ const MESSAGES = defineMessages({
     devicesHint: "Los equipos enlazados con «eq login» o desde Ajustes → Sincronización de una app local aparecen aquí como dispositivos; revocar uno corta su sincronización.", deviceBadge: "dispositivo",
     conflicts: "Conflictos de sincronización", conflictsHint: "Un dispositivo cambió algo que en la nube también cambió. Se aplicó el valor de la nube; elige cuál se queda.",
     appearance: "Apariencia", appearanceHint: "Tema, color de acento, gris, radio y escala. Se guardan en este navegador.", copy: "Copiar",
+    resetLink: "Enlace para restablecer la contraseña", resetSent: (email: string) => `Enviamos a ${email} un enlace para elegir una contraseña nueva (vale 30 minutos).`,
+    resetShown: "Pasa este enlace a la persona por un canal de confianza (vale 30 minutos, se usa una vez y se muestra una sola vez):",
     roles: "Lector: ve todo. Editor: edita la configuración y lanza corridas de solo lectura. Administrador: entornos, credenciales, corridas con escrituras, carga, miembros y tokens. Propietario: además, los roles.",
   },
   en: {
@@ -39,6 +42,8 @@ const MESSAGES = defineMessages({
     devicesHint: "Devices linked with \"eq login\" or from a local app's Settings → Sync show up here as devices; revoking one stops its sync.", deviceBadge: "device",
     conflicts: "Sync conflicts", conflictsHint: "A device changed something that also changed in the cloud. The cloud's value was applied; choose which one stays.",
     appearance: "Appearance", appearanceHint: "Theme, accent colour, gray, radius and scaling. Saved in this browser.", copy: "Copy",
+    resetLink: "Password reset link", resetSent: (email: string) => `We emailed ${email} a link to choose a new password (valid for 30 minutes).`,
+    resetShown: "Pass this link on to the person through a channel you trust (valid for 30 minutes, works once, shown only once):",
     roles: "Viewer: sees everything. Editor: edits configuration and starts read-only runs. Admin: environments, credentials, runs with writes, load tests, members and tokens. Owner: also roles.",
   },
 });
@@ -73,6 +78,7 @@ export function SettingsPage({ crumbs }: { crumbs: Crumb[] }) {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [inviteLink, setInviteLink] = useState("");
+  const [resetLink, setResetLink] = useState("");
   const [issued, setIssued] = useState("");
   const [form, setForm] = useState({ current: "", next: "", workspace: "", email: "", inviteRole: "editor", tokenName: "", tokenRole: "editor" });
   const set = (patch: Partial<typeof form>) => setForm((value) => ({ ...value, ...patch }));
@@ -129,8 +135,10 @@ export function SettingsPage({ crumbs }: { crumbs: Crumb[] }) {
         <Table.Root size="1" variant="ghost" className="mt-3 text-xs"><Table.Body>{(members.data ?? []).map((member) => <Table.Row key={member.userId} align="center">
           <Table.Cell className="font-medium">{member.name}</Table.Cell><Table.Cell className="text-slate-500">{member.email}</Table.Cell>
           <Table.Cell>{role === "owner" ? <Select.Root size="1" value={member.role} onValueChange={(value) => { void act(async () => { await API.changeRole(member.userId, value); await reloadSession(); }); }}><Select.Trigger aria-label={`${member.email} role`}/><Select.Content>{ROLES.map((item) => <Select.Item key={item} value={item}>{t.role[item]}</Select.Item>)}</Select.Content></Select.Root> : t.role[member.role]}</Table.Cell>
-          <Table.Cell justify="end">{isAdmin && member.userId !== session.session?.user.id && <IconButton type="button" size="1" variant="ghost" color="red" onClick={() => { void act(() => API.removeMember(member.userId)); }} aria-label={`${t.remove} ${member.email}`}><Trash2 className="size-3.5"/></IconButton>}</Table.Cell>
+          <Table.Cell justify="end">{isAdmin && member.userId !== session.session?.user.id && (role === "owner" || member.role === "viewer" || member.role === "editor") && <IconButton type="button" size="1" variant="ghost" color="gray" className="mr-2" onClick={() => { void act(async () => { setResetLink(""); const link = await API.memberResetLink(member.userId); if (link.token) setResetLink(`${window.location.origin}/?restablecer=${link.token}`); else setNotice(t.resetSent(member.email)); }); }} aria-label={`${t.resetLink} ${member.email}`} title={t.resetLink}><LifeBuoy className="size-3.5"/></IconButton>}
+            {isAdmin && member.userId !== session.session?.user.id && <IconButton type="button" size="1" variant="ghost" color="red" onClick={() => { void act(() => API.removeMember(member.userId)); }} aria-label={`${t.remove} ${member.email}`}><Trash2 className="size-3.5"/></IconButton>}</Table.Cell>
         </Table.Row>)}</Table.Body></Table.Root>
+        {resetLink && <><p className="mt-3 text-[11px] text-slate-600">{t.resetShown}</p><Secret value={resetLink}/></>}
         {isAdmin && <>
           <form className="mt-4 flex flex-wrap gap-2" onSubmit={(event) => { event.preventDefault(); void act(async () => { const invited = await API.invite(form.email, form.inviteRole); setInviteLink(`${window.location.origin}/?invitacion=${invited.token}`); set({ email: "" }); }); }}>
             <TextField.Root size="2" type="email" required aria-label={t.email} placeholder={t.email} value={form.email} onChange={(event) => set({ email: event.target.value })} className="flex-1"/>
@@ -157,6 +165,7 @@ export function SettingsPage({ crumbs }: { crumbs: Crumb[] }) {
           <Table.Cell justify="end">{token.revokedAt ? <span className="text-slate-400">{t.revoked}</span> : <Button type="button" size="1" variant="ghost" color="red" onClick={() => { void act(() => API.revokeApiToken(token.id)); }}>{t.revoke}</Button>}</Table.Cell>
         </Table.Row>)}</Table.Body></Table.Root>
       </Card>}
+      {isAdmin && <AuditLogCard className="xl:col-span-2"/>}
     </div>
   </>;
 }

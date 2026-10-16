@@ -12,6 +12,6 @@ export class HealthController {
   @Get("health")
   async health() {
     await this.db.query("SELECT 1");
-    return { status: "ok", mode: this.config.mode, database: this.config.database.type, auth: this.config.auth?.required ? "required" : "none", registration: this.config.auth?.registration ?? "invite" };
+    return { status: "ok", mode: this.config.mode, database: this.config.database.type, auth: this.config.auth?.required ? "required" : "none", registration: this.config.auth?.registration ?? "invite", sso: this.config.oidc ? { name: this.config.oidc.name } : null };
   }
 }
