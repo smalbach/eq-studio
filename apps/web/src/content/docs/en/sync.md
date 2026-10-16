@@ -76,7 +76,7 @@ By default the environments' tokens, API keys and passwords never leave the mach
 EQ_SYNC_PASSPHRASE='a long phrase only your team knows' eq sync --secrets on
 ```
 
-The passphrase (12+ characters) is typed on each machine; it is never sent. A key derived from it (scrypt) encrypts each credential with AES-256-GCM before it leaves; the cloud keeps text it can neither read nor use. The first machine sets the workspace's passphrase; the others must use the same one, and the app checks it when you turn it on.
+The passphrase (12+ characters) is typed on each machine; it is never sent. A key derived from it (scrypt) encrypts each whole credential (of any kind: its setup, its secret and the others, such as a refresh token, an HMAC key or the client certificate with its private key) with AES-256-GCM before it leaves; the cloud keeps text it can neither read nor use. The first machine sets the workspace's passphrase; the others must use the same one, and the app checks it when you turn it on.
 
 > If the passphrase is lost, the credentials are typed again: there is no way to recover them, by design. A workspace's passphrase cannot be changed.
 

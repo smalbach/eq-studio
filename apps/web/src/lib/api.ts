@@ -50,8 +50,19 @@ export type ProjectSummary = { id: string; slug: string; name: string; rev: numb
 export type ProjectDetail = ProjectSummary & { createdAt: string; environments: number; file: ProjectFile };
 export type EnvironmentView = EnvironmentConfig & { environmentId: string; rev: number; updatedAt: string };
 export type CredentialRole = "primary" | "insufficient" | "alternate";
-export type CredentialKind = "bearer" | "api_key" | "basic" | "oauth2_client_credentials";
-export type CredentialView = { role: CredentialRole; kind: CredentialKind; headerName: string | null; username: string | null; tokenUrl: string | null; clientId: string | null; scope: string | null; lastFour: string | null; hasSecret: boolean; rev: number; updatedAt: string };
+export type CredentialKind = "bearer" | "api_key" | "basic" | "oauth2_client_credentials" | "oauth2_authorization_code" | "cookie" | "hmac" | "mtls";
+/** What a kind needs besides its plain fields; `tls` (a client certificate) fits any kind. Certificates are public: only their private key is a secret. */
+export type CredentialOptions = {
+  cookieName?: string;
+  login?: { method?: "GET" | "POST" | "PUT" | "PATCH"; path: string; body?: string; contentType?: string };
+  hmac?: { algorithm?: "sha256" | "sha512"; header?: string; keyId?: string; keyIdHeader?: string; timestampHeader?: string; template?: string; encoding?: "hex" | "base64" };
+  tls?: { cert: string; ca?: string };
+};
+/** The secrets besides `secret`: never returned, only hinted (the last four of a refresh token, `••••` for a PEM). */
+export type CredentialSecretHints = { refreshToken?: string; tlsKey?: string; tlsPassphrase?: string };
+export type CredentialView = { role: CredentialRole; kind: CredentialKind; headerName: string | null; username: string | null; tokenUrl: string | null; clientId: string | null; scope: string | null; options: CredentialOptions | null; lastFour: string | null; hasSecret: boolean; secretHints: CredentialSecretHints; rev: number; updatedAt: string };
+/** A secret left out keeps the stored one; `""` or `null` clears it. */
+export type CredentialInput = { kind: CredentialKind; secret?: string; headerName?: string | null; username?: string | null; tokenUrl?: string | null; clientId?: string | null; scope?: string | null; options?: CredentialOptions | null; refreshToken?: string | null; tlsKey?: string | null; tlsPassphrase?: string | null };
 export type SpecVersionView = { id: string; hash: string; sourceKind: string; sourceUrl: string | null; openapiVersion: string | null; title: string | null; version: string | null; operationCount: number; createdAt: string; active: boolean };
 export type ExampleView = { id: string; name: string; operations: number; environments: { id: string; name: string; baseUrl: string }[]; summary: string };
 
@@ -99,7 +110,7 @@ export const API = {
   deleteEnvironment: (id: string, environment: string) => api<null>("DELETE", `${project(id)}/environments/${encodeURIComponent(environment)}`),
 
   credentials: (id: string, environment: string) => api<CredentialView[]>("GET", `${project(id)}/environments/${encodeURIComponent(environment)}/credentials`),
-  setCredential: (id: string, environment: string, role: CredentialRole, input: { kind: CredentialKind; secret?: string; headerName?: string | null; username?: string | null; tokenUrl?: string | null; clientId?: string | null; scope?: string | null }) => api<{ lastFour: string | null; rev: number }>("PUT", `${project(id)}/environments/${encodeURIComponent(environment)}/credentials/${role}`, input),
+  setCredential: (id: string, environment: string, role: CredentialRole, input: CredentialInput) => api<{ lastFour: string | null; rev: number }>("PUT", `${project(id)}/environments/${encodeURIComponent(environment)}/credentials/${role}`, input),
   deleteCredential: (id: string, environment: string, role: CredentialRole) => api<null>("DELETE", `${project(id)}/environments/${encodeURIComponent(environment)}/credentials/${role}`),
 
   startRun: (id: string, plan: Record<string, unknown>) => api<{ id: string; total: number }>("POST", `${project(id)}/runs`, plan),

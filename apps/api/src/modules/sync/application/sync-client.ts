@@ -21,6 +21,7 @@ import type { CredentialRow, SyncConflictRow, SyncLinkRow } from "../../../datab
 import { Conflict, Invalid, NotFound, Unreachable } from "../../../shared/errors.ts";
 import { isoNow, uuidv7 } from "../../../shared/ids.ts";
 import { lastFour, type SecretBox } from "../../../shared/secret-box.ts";
+import { openExtras, sealExtras, type ExtraSecrets } from "../../credentials/domain/credential.ts";
 import { APP_CONFIG, SECRET_BOX } from "../../../shared/tokens.ts";
 import { LOCAL_WORKSPACE_ID } from "../../../shared/workspace.ts";
 import { IMMUTABLE, projectOf, sameSnapshot, stable, SYNC_ORDER, withField, type Snapshot, type SyncType } from "../domain/merge.ts";
@@ -290,11 +291,12 @@ export class SyncClient implements OnApplicationBootstrap, OnApplicationShutdown
   private async writeCredential(link: SyncLinkRow, key: Buffer, syncId: string, data: Snapshot, existing: CredentialRow | null) {
     const environmentId = String(data.environmentId);
     const role = String(data.role) as CredentialRow["role"];
-    let plain: Pick<CredentialRow, "kind" | "headerName" | "username" | "tokenUrl" | "clientId" | "scope"> & { secret: string | null };
+    let plain: Pick<CredentialRow, "kind" | "headerName" | "username" | "tokenUrl" | "clientId" | "scope" | "options"> & { secret: string | null; extras?: ExtraSecrets };
     try { plain = JSON.parse(open(key, String(data.sealed), credentialContext(link, syncId))); } catch { throw new SyncError("A credential from the cloud does not decrypt with this passphrase"); }
     const now = isoNow();
-    const row: CredentialRow = existing ?? { id: uuidv7(), workspaceId: WORKSPACE, environmentId, role, kind: plain.kind, headerName: null, username: null, tokenUrl: null, clientId: null, scope: null, secret: null, lastFour: null, rev: 0, createdAt: now, updatedAt: now };
-    const next: CredentialRow = { ...row, kind: plain.kind, headerName: plain.headerName ?? null, username: plain.username ?? null, tokenUrl: plain.tokenUrl ?? null, clientId: plain.clientId ?? null, scope: plain.scope ?? null, secret: plain.secret ? this.box.encrypt(plain.secret, row.id) : null, lastFour: plain.secret ? lastFour(plain.secret) : null, rev: row.rev + 1, updatedAt: now };
+    const row: CredentialRow = existing ?? { id: uuidv7(), workspaceId: WORKSPACE, environmentId, role, kind: plain.kind, headerName: null, username: null, tokenUrl: null, clientId: null, scope: null, secret: null, lastFour: null, options: null, extraSecrets: null, secretHints: null, rev: 0, createdAt: now, updatedAt: now };
+    const next: CredentialRow = { ...row, kind: plain.kind, headerName: plain.headerName ?? null, username: plain.username ?? null, tokenUrl: plain.tokenUrl ?? null, clientId: plain.clientId ?? null, scope: plain.scope ?? null, options: plain.options ?? null, secret: plain.secret ? this.box.encrypt(plain.secret, row.id) : null, lastFour: plain.secret ? lastFour(plain.secret) : null, rev: row.rev + 1, updatedAt: now };
+    sealExtras(next, plain.extras ?? {}, this.box);
     return this.store.saveCredential(next);
   }
 
@@ -324,7 +326,10 @@ export class SyncClient implements OnApplicationBootstrap, OnApplicationShutdown
         if (!key) continue;
         const { row, syncId } = entry;
         const state = states.get(`credential:${syncId}`);
-        const plain = stable({ kind: row.kind, headerName: row.headerName, username: row.username, tokenUrl: row.tokenUrl, clientId: row.clientId, scope: row.scope, secret: row.secret ? this.box.decrypt(row.secret, row.id) : null });
+        // Settings and extra secrets only when there are some: a credential of the first kinds
+        // seals (and tags) exactly as it did before they existed, so it is not pushed again.
+        const extras = openExtras(row, this.box);
+        const plain = stable({ kind: row.kind, headerName: row.headerName, username: row.username, tokenUrl: row.tokenUrl, clientId: row.clientId, scope: row.scope, secret: row.secret ? this.box.decrypt(row.secret, row.id) : null, ...(row.options ? { options: row.options } : {}), ...(Object.keys(extras).length ? { extras } : {}) });
         const data = { environmentId: row.environmentId, role: row.role, tag: createHmac("sha256", key).update(`tag:${plain}`).digest("base64url"), sealed: seal(key, plain, credentialContext(link, syncId)) };
         const item: PushItem = { type: "credential", id: syncId, baseRev: state?.remoteRev ?? null, base: state?.shadow ?? null, data };
         items.push({ item, seq: row.syncSeq ?? 0, size: JSON.stringify(item).length });

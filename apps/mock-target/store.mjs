@@ -12,7 +12,9 @@
  *
  * `server.mjs` runs it from the command line; this module only builds it, so it can be bundled.
  */
+import { createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import http from "node:http";
+import https from "node:https";
 import { openApiDocument } from "./openapi.mjs";
 
 const PROBLEM_BASE = "https://mock-store.example/problems";
@@ -211,16 +213,46 @@ function distanceKm(a, b) {
 
 const TOKENS = { "admin-token": "admin", "read-token": "read" };
 const API_KEYS = { "demo-key": "api-key" };
+/** Users of `POST /auth/login`, whose session cookie is `eq_session`. */
+const USERS = { admin: { password: "admin-password", role: "admin" }, reader: { password: "read-password", role: "read" } };
+export const SESSION_COOKIE = "eq_session";
+/** A session that always exists: what a pasted cookie value is tested with. */
+const FIXED_SESSIONS = { "admin-session": "admin", "read-session": "read" };
+/** HMAC keys by key id. The signature is `X-Signature`: hex HMAC-SHA256 of
+ * `METHOD\npath?query\ntimestamp\nsha256(body)`, with `X-Timestamp` (Unix seconds, ±5 min). */
+const HMAC_KEYS = { "demo-hmac": { secret: "hmac-secret", role: "admin" }, "read-hmac": { secret: "hmac-read-secret", role: "read" } };
+const HMAC_WINDOW_S = 300;
+
+function cookiesOf(req) {
+  return Object.fromEntries(String(req.headers.cookie ?? "").split(";").map((part) => part.trim()).filter(Boolean).map((part) => [part.slice(0, part.indexOf("=")), part.slice(part.indexOf("=") + 1)]));
+}
+
+function hmacRole(req, method, url, raw, challenge) {
+  const keyId = req.headers["x-key-id"];
+  const key = HMAC_KEYS[String(keyId)];
+  if (!key) throw new HttpError(401, "Unauthorized", "The HMAC key id is not known.", challenge);
+  const timestamp = String(req.headers["x-timestamp"] ?? "");
+  if (!/^\d+$/.test(timestamp) || Math.abs(Date.now() / 1000 - Number(timestamp)) > HMAC_WINDOW_S) throw new HttpError(401, "Unauthorized", "The X-Timestamp is missing or outside the 5-minute window.", challenge);
+  const stringToSign = `${method}\n${url.pathname}${url.search}\n${timestamp}\n${createHash("sha256").update(raw).digest("hex")}`;
+  const expected = Buffer.from(createHmac("sha256", key.secret).update(stringToSign).digest("hex"));
+  const given = Buffer.from(String(req.headers["x-signature"] ?? ""));
+  if (given.length !== expected.length || !timingSafeEqual(given, expected)) throw new HttpError(401, "Unauthorized", "The HMAC signature does not match the request.", challenge);
+  return key.role;
+}
 
 /**
  * 401 is "who are you?" and 403 is "I know who you are, and no". A valid API key sent to a
  * DELETE is a 401: the operation does not accept that kind of credential at all, which is a
  * different finding from a token whose scope falls short.
+ *
+ * Besides a bearer token or an API key: an HMAC-signed request, a session cookie, or a client
+ * certificate the server's CA signed (when it serves TLS), in that order.
  */
-function authorize(req, method) {
+function authorize(req, method, url, raw, sessions) {
   const challenge = { "WWW-Authenticate": 'Bearer realm="mock-store"' };
   const authorization = req.headers.authorization;
   const apiKey = req.headers["x-api-key"];
+  const session = cookiesOf(req)[SESSION_COOKIE];
   let role;
   if (authorization) {
     const match = /^Bearer\s+(.+)$/i.exec(authorization);
@@ -229,6 +261,13 @@ function authorize(req, method) {
   } else if (typeof apiKey === "string") {
     role = API_KEYS[apiKey];
     if (!role) throw new HttpError(401, "Unauthorized", "The API key is not valid.", challenge);
+  } else if (req.headers["x-signature"] !== undefined) {
+    role = hmacRole(req, method, url, raw, challenge);
+  } else if (session !== undefined) {
+    role = FIXED_SESSIONS[session] ?? sessions.get(session);
+    if (!role) throw new HttpError(401, "Unauthorized", "The session has expired or is not valid.", challenge);
+  } else if (req.socket.authorized) {
+    role = "admin";
   } else {
     throw new HttpError(401, "Unauthorized", "This operation needs a bearer token or an API key.", challenge);
   }
@@ -239,10 +278,15 @@ function authorize(req, method) {
 // --- routes --------------------------------------------------------------------------------
 
 /**
- * @param {{ auth?: boolean, latencyMs?: number, faults?: { brokenEnvelope?: boolean } }} [options]
+ * `tls` serves HTTPS; with `ca`, it asks for a client certificate and accepts one that CA signed
+ * as the admin (mutual TLS). A connection without one still opens: its requests get the 401.
+ *
+ * @param {{ auth?: boolean, latencyMs?: number, faults?: { brokenEnvelope?: boolean }, tls?: { cert: string, key: string, ca?: string } }} [options]
  */
-export function createMockServer({ auth = false, latencyMs = 0, faults = {} } = {}) {
+export function createMockServer({ auth = false, latencyMs = 0, faults = {}, tls } = {}) {
   let state = seedState();
+  /** Session id → role, from `POST /auth/login`. */
+  const sessions = new Map();
   const spec = openApiDocument();
 
   /** A single resource, in its envelope — unless the fault switch says to forget it, which is
@@ -448,31 +492,58 @@ export function createMockServer({ auth = false, latencyMs = 0, faults = {} } = 
     },
   ];
 
-  async function readBody(req) {
+  async function readRaw(req) {
     const chunks = [];
     for await (const chunk of req) chunks.push(chunk);
-    const raw = Buffer.concat(chunks).toString("utf8");
-    if (!raw) return undefined;
-    try { return JSON.parse(raw); } catch { throw invalid("The body is not valid JSON."); }
+    return Buffer.concat(chunks);
+  }
+
+  function parseBody(raw) {
+    const text = raw.toString("utf8");
+    if (!text) return undefined;
+    try { return JSON.parse(text); } catch { throw invalid("The body is not valid JSON."); }
+  }
+
+  /**
+   * `POST /auth/login` with `{ "username", "password" }` (JSON or a form) answers 204 and a
+   * session cookie. Outside the contract on purpose: it is how a cookie credential logs in, not
+   * an operation of the store.
+   */
+  function login(req, raw) {
+    const text = raw.toString("utf8");
+    let input;
+    if (String(req.headers["content-type"] ?? "").includes("x-www-form-urlencoded")) input = Object.fromEntries(new URLSearchParams(text));
+    else { try { input = text ? JSON.parse(text) : {}; } catch { throw invalid("The body is not valid JSON."); } }
+    const user = USERS[String(input?.username ?? "")];
+    if (!user || user.password !== input?.password) throw new HttpError(401, "Unauthorized", "Wrong username or password.");
+    const id = randomBytes(16).toString("hex");
+    sessions.set(id, user.role);
+    return { status: 204, headers: { "Set-Cookie": `${SESSION_COOKIE}=${id}; Path=/; HttpOnly; SameSite=Lax` } };
   }
 
   async function handle(req) {
     const url = new URL(req.url ?? "/", "http://mock-store.local");
     const method = (req.method ?? "GET").toUpperCase();
+    if (url.pathname === "/auth/login") {
+      if (method !== "POST") throw new HttpError(405, "Method Not Allowed", `${method} is not supported on ${url.pathname}.`, { Allow: "POST" });
+      return login(req, await readRaw(req));
+    }
     for (const route of routes) {
       const match = route.pattern.exec(url.pathname);
       if (!match) continue;
       const handler = route.methods[method];
       if (!handler) throw new HttpError(405, "Method Not Allowed", `${method} is not supported on ${url.pathname}.`, { Allow: Object.keys(route.methods).join(", ") });
+      // The raw body is read first: an HMAC signature covers its bytes.
+      const raw = await readRaw(req);
       // Authentication comes before anything that could reveal whether a resource exists.
-      if (auth && !route.public) authorize(req, method);
-      const body = ["POST", "PUT", "PATCH"].includes(method) ? await readBody(req) : undefined;
+      if (auth && !route.public) authorize(req, method, url, raw, sessions);
+      const body = ["POST", "PUT", "PATCH"].includes(method) ? parseBody(raw) : undefined;
       return handler({ params: match.groups ?? {}, query: url.searchParams, url, body });
     }
     throw notFound(`No route for ${url.pathname}.`);
   }
 
-  const server = http.createServer(async (req, res) => {
+  const listener = async (req, res) => {
     let result;
     try {
       result = await handle(req);
@@ -495,7 +566,8 @@ export function createMockServer({ auth = false, latencyMs = 0, faults = {} } = 
     headers["Content-Length"] = String(Buffer.byteLength(payload));
     res.writeHead(result.status, headers);
     res.end(payload);
-  });
+  };
+  const server = tls ? https.createServer({ cert: tls.cert, key: tls.key, ...(tls.ca ? { ca: tls.ca, requestCert: true, rejectUnauthorized: false } : {}) }, listener) : http.createServer(listener);
 
   return {
     server,
@@ -506,7 +578,7 @@ export function createMockServer({ auth = false, latencyMs = 0, faults = {} } = 
         server.listen(port, host, () => {
           server.off("error", reject);
           const address = /** @type {import("node:net").AddressInfo} */ (server.address());
-          resolve({ port: address.port, url: `http://${host}:${address.port}` });
+          resolve({ port: address.port, url: `${tls ? "https" : "http"}://${host}:${address.port}` });
         });
       });
     },
@@ -519,6 +591,10 @@ export function createMockServer({ auth = false, latencyMs = 0, faults = {} } = 
     /** Back to the seed: what a test calls between runs that must start from the same data. */
     reset() {
       state = seedState();
+    },
+    /** Forgets every login session: the next request with one gets a 401, as when it expires. */
+    expireSessions() {
+      sessions.clear();
     },
   };
 }

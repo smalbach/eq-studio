@@ -62,6 +62,37 @@ async function target(project: string | undefined, flags: Flags): Promise<{ api:
   return { api: remote(flags), project };
 }
 
+const bearer = (token: string | undefined) => token ? { kind: "bearer", secret: token } : null;
+
+function readPem(flags: Flags, name: string) {
+  const file = str(flags, name);
+  if (!file) return undefined;
+  try { return readFileSync(file, "utf8"); } catch (error) { throw new CliError(`--${name} ${file}: ${error instanceof Error ? error.message : String(error)}`, EXIT.usage); }
+}
+
+/**
+ * The primary credential from the flags: a bearer token, a session cookie or an HMAC key — one
+ * of them — and, with --client-cert, a client certificate on top (alone, it is the credential).
+ */
+export function primaryCredential(flags: Flags): Record<string, unknown> | null {
+  const cookie = str(flags, "cookie") ?? process.env.EQ_COOKIE;
+  const hmacKey = str(flags, "hmac-key") ?? process.env.EQ_HMAC_KEY;
+  const given = [
+    bearer(str(flags, "token") ?? process.env.EQ_TOKEN),
+    cookie ? (() => { const at = cookie.indexOf("="); if (at < 1) throw new CliError("--cookie takes NAME=VALUE", EXIT.usage); return { kind: "cookie", secret: cookie.slice(at + 1), options: { cookieName: cookie.slice(0, at) } }; })() : null,
+    hmacKey ? { kind: "hmac", secret: hmacKey, options: { hmac: { ...(str(flags, "hmac-key-id") ? { keyId: str(flags, "hmac-key-id") } : {}) } } } : null,
+  ].filter((item) => item !== null);
+  if (given.length > 1) throw new CliError("Pass one primary credential: --token, --cookie or --hmac-key", EXIT.usage);
+  const cert = readPem(flags, "client-cert");
+  const key = readPem(flags, "client-key");
+  if (Boolean(cert) !== Boolean(key)) throw new CliError("--client-cert and --client-key go together", EXIT.usage);
+  if (!cert || !key) return given[0] ?? null;
+  const ca = readPem(flags, "client-ca");
+  const passphrase = str(flags, "client-key-passphrase") ?? process.env.EQ_CLIENT_KEY_PASSPHRASE;
+  const base = given[0] ?? { kind: "mtls" };
+  return { ...base, options: { ...((base as { options?: object }).options ?? {}), tls: { cert, ...(ca ? { ca } : {}) } }, tlsKey: key, ...(passphrase ? { tlsPassphrase: passphrase } : {}) };
+}
+
 type EnvironmentView = { id: string; environmentId: string; name: string; baseUrl: string; authEnabled?: boolean };
 
 /** The environment, with `--base-url` and the credential flags applied to it. */
@@ -73,12 +104,12 @@ async function environment(api: Client, project: string, flags: Flags): Promise<
   const baseUrl = str(flags, "base-url");
   if (baseUrl) await api.patch(`/v1/projects/${project}/environments/${found.environmentId}`, { baseUrl });
   // Secrets from flags or the environment, never from a file in the repository.
-  const credentials: [string, string | undefined, Record<string, unknown>][] = [
-    ["primary", str(flags, "token") ?? process.env.EQ_TOKEN, { kind: "bearer" }],
-    ["insufficient", str(flags, "read-token") ?? process.env.EQ_READ_TOKEN, { kind: "bearer" }],
-    ["alternate", str(flags, "api-key") ?? process.env.EQ_API_KEY, { kind: "api_key", ...(str(flags, "api-key-header") ? { headerName: str(flags, "api-key-header") } : {}) }],
+  const credentials: [string, Record<string, unknown> | null][] = [
+    ["primary", primaryCredential(flags)],
+    ["insufficient", bearer(str(flags, "read-token") ?? process.env.EQ_READ_TOKEN)],
+    ["alternate", (str(flags, "api-key") ?? process.env.EQ_API_KEY) ? { kind: "api_key", secret: str(flags, "api-key") ?? process.env.EQ_API_KEY, ...(str(flags, "api-key-header") ? { headerName: str(flags, "api-key-header") } : {}) } : null],
   ];
-  for (const [role, secret, rest] of credentials) if (secret) await api.put(`/v1/projects/${project}/environments/${found.environmentId}/credentials/${role}`, { ...rest, secret });
+  for (const [role, body] of credentials) if (body) await api.put(`/v1/projects/${project}/environments/${found.environmentId}/credentials/${role}`, body);
   return { ...found, baseUrl: baseUrl ?? found.baseUrl };
 }
 

@@ -217,7 +217,22 @@ export type RunCaseRow = {
 };
 
 export type CredentialRole = "primary" | "insufficient" | "alternate";
-export type CredentialKind = "bearer" | "api_key" | "basic" | "oauth2_client_credentials";
+export type CredentialKind = "bearer" | "api_key" | "basic" | "oauth2_client_credentials" | "oauth2_authorization_code" | "cookie" | "hmac" | "mtls";
+
+/** The secrets a credential holds besides `secret`, each encrypted with the rest in `extraSecrets`. */
+export type CredentialSecretName = "refreshToken" | "tlsKey" | "tlsPassphrase";
+
+/**
+ * What a kind needs besides its secret, none of it secret: a cookie's name or login request,
+ * how an HMAC signature is built, the client certificate and CA of mutual TLS (public PEM; the
+ * private key is an extra secret).
+ */
+export type CredentialOptions = {
+  cookieName?: string;
+  login?: { method?: string; path: string; body?: string; contentType?: string };
+  hmac?: { algorithm?: "sha256" | "sha512"; header?: string; keyId?: string; keyIdHeader?: string; timestampHeader?: string; template?: string; encoding?: "hex" | "base64" };
+  tls?: { cert: string; ca?: string };
+};
 
 /**
  * A credential of an environment, one per role. The secret is encrypted (AES-256-GCM) with a key
@@ -238,6 +253,11 @@ export type CredentialRow = {
   scope: string | null;
   secret: string | null;
   lastFour: string | null;
+  options?: CredentialOptions | null;
+  /** `CredentialSecretName` → value, as one JSON object encrypted like `secret`. */
+  extraSecrets?: string | null;
+  /** What a read may show of each extra secret: its last four characters at most. */
+  secretHints?: Partial<Record<CredentialSecretName, string>> | null;
   rev: number;
   createdAt: string;
   updatedAt: string;
@@ -301,6 +321,9 @@ export const CredentialEntity = new EntitySchema<CredentialRow>({
     scope: { type: "text", nullable: true },
     secret: { type: "text", nullable: true },
     lastFour: { type: "varchar", length: 8, name: "last_four", nullable: true },
+    options: { type: "simple-json", nullable: true },
+    extraSecrets: { type: "text", name: "extra_secrets", nullable: true },
+    secretHints: { type: "simple-json", name: "secret_hints", nullable: true },
     rev: { type: "integer" },
     createdAt: { ...stamp, name: "created_at" },
     updatedAt: { ...stamp, name: "updated_at" },

@@ -77,7 +77,7 @@ The `Local (auth)` environment points at the mock on port 4011, which enforces c
 | `insufficient` | Bearer | `read-token` (GET only: writes answer 403) |
 | `alternate` | API key in `X-API-Key` | `demo-key` (everything except DELETE, which answers 401) |
 
-They are the mock's test values, not real secrets.
+They are the mock's test values, not real secrets. The mock also takes a session cookie, an HMAC signature and a client certificate to try those kinds: the values are in [CLI and CI](doc:cli).
 
 ## Without development mode
 

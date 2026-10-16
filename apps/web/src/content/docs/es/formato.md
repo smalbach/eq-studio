@@ -173,6 +173,8 @@ Gana la primera regla que coincide. `path` es un glob sobre la ruta con placehol
 | `enforceLatency` | `true` en localhost | Si los presupuestos deciden el caso. |
 | `authEnabled` | `false` | Si la API exige credenciales: habilita los casos 401/403. |
 
+Las credenciales no viajan en el `.eq.json`, de ningún tipo: ni los secretos (tokens, contraseñas, refresh tokens, claves HMAC, claves privadas) ni su configuración (el login de una cookie, cómo se firma un HMAC, el certificado de cliente). Viven en cada entorno del API, cifradas, y se configuran en la guía [Credenciales](guide:credentials), por el API o con los flags de `eq run`. Entre equipos solo se mueven con la [sincronización](doc:sync), cifradas de extremo a extremo, y únicamente si el workspace tiene una passphrase de sincronización.
+
 ## load
 
 ```json

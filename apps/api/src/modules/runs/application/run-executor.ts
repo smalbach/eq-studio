@@ -59,12 +59,12 @@ export class RunExecutor {
   /** The environment as the engine's executor sees it, ids discovered when it is not the seed. */
   private async environment(context: RunContext, locale: "es" | "en", samples: number) {
     const credentials = await this.contexts.credentials(context);
-    const env: ExecutionEnvironment = { baseUrl: context.environment.baseUrl, specUrl: context.environment.specUrl ?? undefined, specHeaders: credentials.specHeaders, credentialsFor: (scenario) => credentials.headersFor(scenario.auth), samples, enforceLatency: context.settings.enforceLatency, locale };
+    const env: ExecutionEnvironment = { baseUrl: context.environment.baseUrl, specUrl: context.environment.specUrl ?? undefined, specHeaders: credentials.specHeaders, credentialsFor: (scenario) => credentials.headersFor(scenario.auth), fetchFor: (scenario) => credentials.fetchFor(scenario.auth), specFetch: credentials.specFetch, samples, enforceLatency: context.settings.enforceLatency, locale };
     let empty: string[] = [];
     if (!context.settings.seeded) {
       const config = context.config;
       const found = await discoverIds(config.seed?.sources ?? [], async (path, operationPath) => {
-        const result = await executeCase({ baseUrl: env.baseUrl, method: "GET", path, operationPath, expectedStatus: 200, headers: credentials.specHeaders, specHeaders: credentials.specHeaders, specUrl: env.specUrl, envelopeKey: config.envelope?.dataKey ?? "data", enforceLatency: false }, this.fetchImpl);
+        const result = await executeCase({ baseUrl: env.baseUrl, method: "GET", path, operationPath, expectedStatus: 200, headers: credentials.specHeaders, specHeaders: credentials.specHeaders, specUrl: env.specUrl, envelopeKey: config.envelope?.dataKey ?? "data", enforceLatency: false }, credentials.specFetch);
         return result.actual ? { status: result.actual.status, body: result.actual.body } : null;
       }, config.envelope);
       env.lists = found.lists;
@@ -144,7 +144,7 @@ export class RunExecutor {
     let data: Record<string, string[]> = plan.data ?? defaultLoadData(dataKeys, loadConfig, catalog);
     if (!plan.data && !context.settings.seeded) {
       const found = await discoverLoadData(async (path, operationPath) => {
-        const result = await executeCase({ baseUrl: context.environment.baseUrl, method: "GET", path, operationPath, expectedStatus: 200, headers: credentials.specHeaders, specHeaders: credentials.specHeaders, specUrl: context.environment.specUrl ?? undefined, envelopeKey: context.config.envelope?.dataKey ?? "data", enforceLatency: false }, this.fetchImpl);
+        const result = await executeCase({ baseUrl: context.environment.baseUrl, method: "GET", path, operationPath, expectedStatus: 200, headers: credentials.specHeaders, specHeaders: credentials.specHeaders, specUrl: context.environment.specUrl ?? undefined, envelopeKey: context.config.envelope?.dataKey ?? "data", enforceLatency: false }, credentials.specFetch);
         return result.actual ? { status: result.actual.status, body: result.actual.body } : null;
       }, context.config.seed?.sources ?? [], context.config.envelope);
       data = { ...data, ...Object.fromEntries(Object.entries(found.data).filter(([, values]) => values.length)) };
@@ -156,7 +156,7 @@ export class RunExecutor {
     if (problems.length) { await this.finish(run, "error", problems.join(" ")); return; }
     let checks: { ok: boolean }[] = [];
     if (plan.onPreflightFailure !== "ignore") {
-      checks = await preflight(loadPlan, { fetchImpl: this.fetchImpl });
+      checks = await preflight(loadPlan, { fetchImpl: credentials.fetchFor("default") });
       const failed = new Set(checks.flatMap((check, index) => check.ok ? [] : [index]));
       if (failed.size && plan.onPreflightFailure === "stop") { await this.finish(run, "error", `Preflight: ${failed.size} of ${checks.length} targets do not answer as expected; no load was sent`, { report: { preflight: checks } }); return; }
       loadPlan.targets = loadPlan.targets.filter((_, index) => !failed.has(index));
@@ -166,7 +166,8 @@ export class RunExecutor {
     const windows: unknown[] = [];
     let lastWrite = 0;
     const report = await runLoad(loadPlan, {
-      fetchImpl: this.fetchImpl,
+      // The primary credential's connection: an HMAC signature per request, a renewed token.
+      fetchImpl: credentials.fetchFor("default"),
       isAborted: () => aborted,
       onTick: async (tick: object) => {
         const event = tick as { type?: string; window?: unknown };

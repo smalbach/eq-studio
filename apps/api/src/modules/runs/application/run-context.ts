@@ -39,6 +39,6 @@ export class RunContextLoader {
   }
 
   credentials(context: RunContext): Promise<Credentials> {
-    return this.resolver.forEnvironment(context.environment.id, context.config.auth?.apiKeyHeader);
+    return this.resolver.forEnvironment(context.environment.id, context.config.auth?.apiKeyHeader, context.environment.baseUrl);
   }
 }

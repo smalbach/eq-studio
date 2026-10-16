@@ -25,7 +25,7 @@ An environment never holds secrets.
 
 ## Credential
 
-What is presented to authenticate in an environment: a **bearer** token, an **API key** in a header, a **Basic** username and password, or **OAuth2 client credentials** (the API fetches the token once per run). Each environment has up to three, by **role**:
+What is presented to authenticate in an environment: a **bearer** token, an **API key** in a header, a **Basic** username and password, **OAuth2** (client credentials, or an authorization-code refresh token), a **session cookie** (pasted or obtained with a login), a per-request **HMAC signature** or a **client certificate** (mTLS, alone or added to another kind). Each one in detail in [Functional verification](doc:funcional). Each environment has up to three, by **role**:
 
 | Role | For |
 | --- | --- |

@@ -41,6 +41,17 @@ and enforcing credentials on `:4011` (`Bearer admin-token`; `Bearer read-token` 
 `X-API-Key: demo-key`). `--port` changes the first one; the second is the next. Restarting it puts
 the data back as the example's seed.
 
+The one on `:4011` also takes the other credential kinds, to try them without a real server (with
+admin permissions; the values in brackets are read-only, for the 403s):
+
+- **Cookie by login**: `POST /auth/login` with `{"username":"admin","password":"admin-password"}`
+  (`reader` / `read-password`) answers a `Set-Cookie: eq_session=…`.
+- **Pasted cookie**: `eq_session=admin-session` (`read-session`).
+- **HMAC**: `X-Key-Id: demo-hmac` with the key `hmac-secret` (`read-hmac` / `hmac-read-secret`), the
+  default template in sha256 hex and a time within ±5 minutes.
+- **mTLS**: `node apps/mock-target/server.mjs --port 4011 --auth --tls-cert server.crt --tls-key server.key --tls-ca ca.crt`
+  serves HTTPS and accepts a client certificate signed by that CA as admin.
+
 ## Runs in CI
 
 The simplest thing in a pipeline is to run **from the project file**: `eq` starts an API for
@@ -53,8 +64,9 @@ eq run --file store-api.eq.json --env staging \
 ```
 
 - `--base-url` replaces the environment's URL: the same file serves every branch or deployment.
-- Credentials come from flags or variables (`EQ_TOKEN`, `EQ_READ_TOKEN`, `EQ_API_KEY`), never
-  from the file: the `.eq.json` is versioned without secrets.
+- Credentials come from flags or variables (`EQ_TOKEN`, `EQ_READ_TOKEN`, `EQ_API_KEY`,
+  `EQ_COOKIE`, `EQ_HMAC_KEY`, `EQ_CLIENT_KEY_PASSPHRASE`), never from the file: the `.eq.json` is
+  versioned without secrets.
 - `--junit` writes a JUnit XML report. `--json` saves the whole run.
 
 | Option | What it does |
@@ -68,6 +80,10 @@ eq run --file store-api.eq.json --env staging \
 | `--token T` | `primary` credential, bearer (or `EQ_TOKEN`). |
 | `--read-token T` | `insufficient` credential, bearer, for the 403s (or `EQ_READ_TOKEN`). |
 | `--api-key K` · `--api-key-header H` | `alternate` credential, API key (or `EQ_API_KEY`), and its header. |
+| `--cookie NAME=VALUE` | `primary` credential as a pasted session cookie (or `EQ_COOKIE`). Instead of `--token`. |
+| `--hmac-key K` · `--hmac-key-id ID` | `primary` credential as an HMAC key, with the default signature (or `EQ_HMAC_KEY`). Instead of `--token`. |
+| `--client-cert FILE --client-key FILE` | A PEM client certificate (mTLS) on the `primary` credential: alone, or added to `--token`, `--cookie` or `--hmac-key`. |
+| `--client-key-passphrase P` · `--client-ca FILE` | The key's passphrase (or `EQ_CLIENT_KEY_PASSPHRASE`) and the PEM CA to trust the server with. |
 | `--samples N` · `--delay MS` | Samples per case and pause between cases. |
 | `--locale es\|en` | Language of the case names (default `en`). |
 | `--scope "name"` | A name for the run in the history and in the report. |

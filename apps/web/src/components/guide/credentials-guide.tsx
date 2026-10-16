@@ -3,6 +3,7 @@ import { Button, Link, RadioCards, Spinner } from "@radix-ui/themes";
 import { PlugZap } from "lucide-react";
 import type { Environment } from "@/components/environment/use-environment";
 import { credentialDraftOf, EMPTY_CREDENTIAL, KindPicker, ValueFields, type CredentialForm } from "@/components/guide/credential-fields";
+import { SECRET_FIELDS } from "@/lib/credentials.mjs";
 import { choice, errorText, Example, fetchMatrix, GuideFrame, Notice, ProbeOutcome, useGuideDraft, type Matrix } from "@/components/guide/guide-kit";
 import type { GuideEntry } from "@/components/guide/guides";
 import { API, type CredentialRole, type ProbeResult } from "@/lib/api";
@@ -46,6 +47,18 @@ const MESSAGES = defineMessages({
   },
 });
 
+/** What each kind stores besides its secrets, as the API keeps it. */
+const EXAMPLES: Record<CredentialForm["kind"], string> = {
+  bearer: `{ "kind": "bearer" }`,
+  api_key: `{ "kind": "api_key", "headerName": "X-API-Key" }`,
+  basic: `{ "kind": "basic", "username": "qa-bot" }`,
+  oauth2_client_credentials: `{ "kind": "oauth2_client_credentials",\n  "tokenUrl": "https://auth.example.com/oauth/token",\n  "clientId": "store-ci",\n  "scope": "orders:read" }`,
+  oauth2_authorization_code: `{ "kind": "oauth2_authorization_code",\n  "tokenUrl": "https://auth.example.com/oauth/token",\n  "clientId": "store-web" }\n// + refresh token, client secret: encrypted`,
+  cookie: `{ "kind": "cookie", "username": "admin",\n  "options": { "login": { "method": "POST",\n    "path": "/auth/login",\n    "body": "{\\"username\\":\\"{{username}}\\",\\"password\\":\\"{{password}}\\"}" } } }`,
+  hmac: `{ "kind": "hmac", "options": { "hmac": {\n  "algorithm": "sha256", "keyId": "demo-hmac",\n  "template": "{method}\\\\n{path}\\\\n{timestamp}\\\\n{bodyHash}" } } }`,
+  mtls: `{ "kind": "mtls", "options": { "tls": {\n  "cert": "-----BEGIN CERTIFICATE-----…" } } }\n// + private key, passphrase: encrypted`,
+};
+
 /** The case that tests each role, and the operation to run it on: reads first, a GET list best. */
 function testTarget(matrix: Matrix, role: CredentialRole) {
   const scenarioId = role === "insufficient" ? "auth-insufficient" : role === "alternate" ? "auth-api-key" : null;
@@ -64,22 +77,32 @@ function testTarget(matrix: Matrix, role: CredentialRole) {
   return candidates.sort((a, b) => rank(a.operation.method, a.operation.path) - rank(b.operation.method, b.operation.path))[0] ?? null;
 }
 
-type Draft = Omit<CredentialForm, "secret"> & { role: CredentialRole };
-const INITIAL: Draft = { kind: EMPTY_CREDENTIAL.kind, headerName: "", username: "", tokenUrl: "", clientId: "", scope: "", role: "primary" };
+type SecretName = (typeof SECRET_FIELDS)[number];
+type Secrets = Pick<CredentialForm, SecretName>;
+type Draft = Omit<CredentialForm, SecretName> & { role: CredentialRole };
+const NO_SECRETS: Secrets = { secret: "", refreshToken: "", tlsKey: "", tlsPassphrase: "" };
+/** Splits a form into what may be kept in the browser and the secrets that may not. */
+const split = (value: CredentialForm) => {
+  const secrets = Object.fromEntries(SECRET_FIELDS.map((name) => [name, value[name]])) as Secrets;
+  const rest = Object.fromEntries(Object.entries(value).filter(([name]) => !(SECRET_FIELDS as readonly string[]).includes(name))) as Omit<CredentialForm, SecretName>;
+  return { secrets, rest };
+};
+const INITIAL: Draft = { ...split(EMPTY_CREDENTIAL).rest, role: "primary" };
 
 /** One credential: its kind, its value, the role it plays, and a probe that shows it works. */
 export function CredentialsGuide({ guide, workspace, env, step, onStep, onGuide, onDone }: { guide: GuideEntry; workspace: Workspace; env: Environment; step: number; onStep: (step: number) => void; onGuide: (guide: string) => void; onDone: (target: "functional" | "load" | "home") => void }) {
   const t = useMessages(MESSAGES);
   const locale = useLocale();
   const [draft, update, reset] = useGuideDraft<Draft>("credentials", INITIAL);
-  // The secret lives only here, never in the resumable draft.
-  const [secret, setSecret] = useState("");
+  // The secrets live only here, never in the resumable draft.
+  const [secrets, setSecrets] = useState<Secrets>(NO_SECRETS);
   const [target, setTarget] = useState<ReturnType<typeof testTarget> | undefined>(undefined);
   const [result, setResult] = useState<ProbeResult | null>(null);
   const [error, setError] = useState("");
   const [testing, setTesting] = useState(false);
-  const form: CredentialForm = { ...draft, secret };
-  const setForm = (value: CredentialForm) => { const { secret: typed, ...rest } = value; setSecret(typed); update(rest); };
+  // A draft saved before the newer kinds lacks their fields: the defaults fill them.
+  const form: CredentialForm = { ...EMPTY_CREDENTIAL, ...draft, ...secrets };
+  const setForm = (value: CredentialForm) => { const { secrets: typed, rest } = split(value); setSecrets(typed); update(rest); };
   const frame = { guide, step, onStep, maxStep: step };
   const current = (role: CredentialRole) => env.credentials.find((item) => item.role === role);
 
@@ -91,7 +114,7 @@ export function CredentialsGuide({ guide, workspace, env, step, onStep, onGuide,
     const value = credentialDraftOf(form);
     if (!value) return false;
     await API.setCredential(env.projectId, env.environmentId, draft.role, value);
-    setSecret("");
+    setSecrets(NO_SECRETS);
     await workspace.refresh();
     return true;
   }
@@ -112,15 +135,15 @@ export function CredentialsGuide({ guide, workspace, env, step, onStep, onGuide,
   }
 
   if (step === 0) return <GuideFrame {...frame} title={t.kindTitle} intro={t.kindIntro} canNext={Boolean(env.environmentId)} doc="conceptos"
-    example={<Example code={`Authorization: Bearer eyJhbGciOi…\nX-API-Key: k_live_…\nAuthorization: Basic dXNlcjpwYXNz`}/>}>
+    example={<Example code={`Authorization: Bearer eyJhbGciOi…\nX-API-Key: k_live_…\nAuthorization: Basic dXNlcjpwYXNz\nCookie: session=…\nX-Signature: 9f2c…  X-Timestamp: 1760600000`}/>}>
     {environmentPicker}
     <KindPicker value={draft.kind} onChange={(kind) => update({ kind })}/>
     {!env.authEnabled && <Notice tone="warn">{t.authOff}</Notice>}
   </GuideFrame>;
 
   if (step === 1) return <GuideFrame {...frame} title={t.valueTitle} intro={t.valueIntro} canNext={credentialDraftOf(form) !== null} doc="conceptos"
-    example={<Example code={draft.kind === "oauth2_client_credentials" ? `{ "kind": "oauth2_client_credentials",\n  "tokenUrl": "https://auth.example.com/oauth/token",\n  "clientId": "store-ci",\n  "scope": "orders:read" }` : draft.kind === "api_key" ? `{ "kind": "api_key", "headerName": "X-API-Key" }` : draft.kind === "basic" ? `{ "kind": "basic", "username": "qa-bot" }` : `{ "kind": "bearer" }`}/>}>
-    <ValueFields value={form} onChange={setForm}/>
+    example={<Example code={EXAMPLES[draft.kind]}/>}>
+    <ValueFields value={form} onChange={setForm} credentialRole={draft.role}/>
   </GuideFrame>;
 
   if (step === 2) return <GuideFrame {...frame} title={t.roleTitle} intro={t.roleIntro} canNext={credentialDraftOf(form) !== null} next={save} nextLabel={t.save} doc="funcional"

@@ -95,6 +95,42 @@ curl -s -X PUT http://127.0.0.1:4400/v1/projects/store-api/environments/staging/
 
 El API pide el token a `tokenUrl` (`grant_type=client_credentials` con `client_id`, `client_secret` y `scope`) una vez por corrida y lo envía como `Bearer`. Empieza con `eq run store-api --env staging --read-only`.
 
+## Tipos de credencial
+
+Cada credencial es de un entorno y de un rol. Todos sus secretos se cifran al guardarse y nunca vuelven: el formulario muestra como mucho una pista (los cuatro últimos caracteres, o `••••` para una clave PEM). Un secreto que dejas vacío conserva el guardado.
+
+| `kind` | Qué guarda | Qué envía |
+| --- | --- | --- |
+| `bearer` | El token. | `Authorization: Bearer …` |
+| `api_key` | La clave y su cabecera (`headerName`, por defecto la del proyecto). | `X-API-Key: …` |
+| `basic` | `username` y la contraseña. | `Authorization: Basic …` |
+| `oauth2_client_credentials` | `tokenUrl`, `clientId`, `scope` y el client secret. | El token que pide a `tokenUrl`, como `Bearer`. |
+| `oauth2_authorization_code` | `tokenUrl`, `clientId`, `scope`, un **refresh token** (obligatorio) y el client secret (opcional en clientes públicos). | El access token que obtiene con el refresh token. |
+| `cookie` | Una cookie pegada (`options.cookieName` + su valor), o un login (`options.login`). | `Cookie: …` |
+| `hmac` | La clave HMAC y cómo firmar (`options.hmac`). | La firma, la hora y el key id en sus cabeceras. |
+| `mtls` | Un certificado de cliente (`options.tls.cert`) y su clave privada. | El certificado en el handshake TLS. |
+
+**OAuth2 authorization code.** El motor cambia el refresh token por un access token, lo reutiliza hasta que vence, lo renueva ante un 401 y guarda el refresh token nuevo cuando el servidor lo rota. La autorización interactiva (redirección del navegador, PKCE) no está incluida: obtén el refresh token con las herramientas de tu proveedor de identidad (un login único, por ejemplo) y pégalo.
+
+**Cookie.** Dos formas:
+
+- *Cookie pegada*: `options.cookieName` y el valor como secreto, tal como lo copiaste del navegador.
+- *Login*: `options.login` con `method` (`POST` por defecto), `path` (relativa a la URL base del entorno, o una URL absoluta), `body` (una plantilla con `{{username}}` y `{{password}}`) y `contentType` (`application/json` por defecto). El usuario va en `username` y la contraseña es el secreto (opcional). Las cookies del `Set-Cookie` de la respuesta se envían en `Cookie`; ante un 401 vuelve a hacer login una vez.
+
+**HMAC.** El secreto es la clave. `options.hmac`: `algorithm` (`sha256` por defecto, o `sha512`), `header` de la firma (`X-Signature`), `keyId` opcional enviado en `keyIdHeader` (`X-Key-Id`), `timestampHeader` (`X-Timestamp`, en segundos Unix), `encoding` (`hex` por defecto, o `base64`) y `template`, el texto que se firma. Por defecto `{method}\n{path}\n{timestamp}\n{bodyHash}`, donde `\n` es un salto de línea; los marcadores son `{method}`, `{path}` (con la query), `{timestamp}`, `{bodyHash}` (el hash hex del cuerpo con el mismo algoritmo) y `{keyId}`.
+
+**Certificado de cliente (mTLS).** `options.tls.cert` (el certificado PEM) y `tlsKey` (su clave privada PEM) son obligatorios; `tlsPassphrase` si la clave está cifrada, y `options.tls.ca` (PEM) para confiar en un servidor con un certificado propio. El API comprueba que la clave sea la pareja del certificado y que abra con la frase, y si no responde 422. Cualquier otro tipo puede llevar también un certificado (bearer + mTLS, por ejemplo): sus cabeceras más el handshake. Quién lo presenta depende de qué papel juega:
+
+- **Combinado** (otro tipo + certificado en la credencial `primary`): el certificado es transporte. Lo presentan también los casos que no tienen uno propio, incluido el de «sin credencial», que así prueba la autenticación del API y no el handshake.
+- **Solo** (`kind: "mtls"`): el certificado es la identidad. El caso «sin credencial» no presenta ninguno, así que puede seguir esperando un 401; los otros roles usan solo su propio certificado, si lo tienen.
+
+```bash
+curl -s -X PUT http://127.0.0.1:4400/v1/projects/store-api/environments/staging/credentials/primary \
+  -H 'content-type: application/json' \
+  -d "$(jq -n --arg token "$TOKEN" --rawfile cert client.crt --rawfile key client.key \
+        '{kind:"bearer", secret:$token, options:{tls:{cert:$cert}}, tlsKey:$key}')"
+```
+
 ## Probar un caso o correr la matriz
 
 - **Probar** (probe) ejecuta un caso con los valores que elijas y no guarda nada. Úsalo mientras ajustas samples o bodies.

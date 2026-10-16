@@ -25,7 +25,7 @@ Un entorno nunca guarda secretos.
 
 ## Credencial
 
-Lo que se presenta para autenticarse en un entorno: un token **bearer**, una **API key** en una cabecera, usuario y contraseña **Basic**, u **OAuth2 client credentials** (el API pide el token una vez por corrida). Cada entorno tiene hasta tres, por **rol**:
+Lo que se presenta para autenticarse en un entorno: un token **bearer**, una **API key** en una cabecera, usuario y contraseña **Basic**, **OAuth2** (client credentials, o un refresh token de authorization code), una **cookie de sesión** (pegada u obtenida con un login), una **firma HMAC** por solicitud o un **certificado de cliente** (mTLS, solo o sumado a otro tipo). Detalle de cada uno en [Verificación funcional](doc:funcional). Cada entorno tiene hasta tres, por **rol**:
 
 | Rol | Para qué |
 | --- | --- |

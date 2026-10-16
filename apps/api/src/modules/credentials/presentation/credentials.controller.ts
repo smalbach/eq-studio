@@ -6,10 +6,23 @@ import { Requires } from "../../../shared/rbac.ts";
 import { Workspace } from "../../../shared/workspace.ts";
 import { DeleteCredentialCommand, SetCredentialCommand } from "../application/commands/credential-commands.ts";
 import { ListCredentialsQuery } from "../application/queries/list-credentials.ts";
+import { CREDENTIAL_KINDS } from "../domain/credential.ts";
 
 const role = z.enum(["primary", "insufficient", "alternate"]);
 const optional = z.string().max(2000).nullable().optional();
-const credential = z.object({ kind: z.enum(["bearer", "api_key", "basic", "oauth2_client_credentials"]), secret: z.string().max(8000).optional(), headerName: z.string().max(200).regex(/^[A-Za-z0-9-]+$/, "a header name").nullable().optional(), username: optional, tokenUrl: z.url({ protocol: /^https?$/ }).nullable().optional(), clientId: optional, scope: optional });
+const header = z.string().max(200).regex(/^[A-Za-z0-9-]+$/, "a header name");
+const pem = (label: string) => z.string().max(65_536).regex(new RegExp(`-----BEGIN ${label}-----`), `a PEM ${label.toLowerCase()}`);
+const extraSecret = z.string().max(65_536).nullable().optional();
+const options = z.object({
+  cookieName: z.string().max(200).regex(/^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/, "a cookie name").optional(),
+  login: z.object({ method: z.enum(["GET", "POST", "PUT", "PATCH"]).optional(), path: z.string().min(1).max(2000), body: z.string().max(8000).optional(), contentType: z.string().max(200).optional() }).optional(),
+  hmac: z.object({ algorithm: z.enum(["sha256", "sha512"]).optional(), header: header.optional(), keyId: z.string().max(500).optional(), keyIdHeader: header.optional(), timestampHeader: header.optional(), template: z.string().max(2000).optional(), encoding: z.enum(["hex", "base64"]).optional() }).optional(),
+  tls: z.object({ cert: pem("CERTIFICATE"), ca: pem("CERTIFICATE").optional() }).optional(),
+}).strict();
+const credential = z.object({
+  kind: z.enum(CREDENTIAL_KINDS), secret: z.string().max(8000).optional(), headerName: header.nullable().optional(), username: optional, tokenUrl: z.url({ protocol: /^https?$/ }).nullable().optional(), clientId: optional, scope: optional,
+  options: options.nullable().optional(), refreshToken: extraSecret, tlsKey: extraSecret, tlsPassphrase: extraSecret,
+});
 
 @Controller("v1/projects/:project/environments/:environment/credentials")
 export class CredentialsController {
