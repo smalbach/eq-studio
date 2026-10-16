@@ -5,7 +5,7 @@
   "private": true,
   "description": "Endpoint Quality as a desktop app for macOS, Windows and Linux: the local API and the web app in one window.",
   "author": "Endpoint Quality",
-  "license": "UNLICENSED",
+  "license": "MIT",
   "main": "dist/main.cjs",
   "scripts": {
     "build": "node scripts/build.mjs",

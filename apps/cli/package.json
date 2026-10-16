@@ -2,7 +2,7 @@
   "name": "endpoint-quality",
   "version": "0.1.0",
   "description": "Endpoint Quality: functional, load and stress verification of any HTTP API against its OpenAPI contract. The app, the API and the `eq` command line in one package.",
-  "license": "UNLICENSED",
+  "license": "MIT",
   "type": "module",
   "bin": {
     "eq": "./bin/eq.mjs",

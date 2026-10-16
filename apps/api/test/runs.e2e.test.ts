@@ -69,10 +69,14 @@ for (const database of databases()) {
       const response = await fetch(`${h.base}/v1/runs/${started.body.id}/stream`);
       assert.match(response.headers.get("content-type") ?? "", /text\/event-stream/);
       const text = await response.text();
-      const events = [...text.matchAll(/^event: (\w+)$/gm)].map((match) => match[1]);
-      assert.equal(events[0], "snapshot");
-      assert.equal(events.at(-1), "finished");
-      assert.ok(events.filter((event) => event === "case").length >= started.body.total, `${events.length} events`);
+      const events = text.split("\n\n").filter((block) => /^event: /m.test(block)).map((block) => ({ type: /^event: (\w+)$/m.exec(block)![1], data: JSON.parse(/^data: (.*)$/m.exec(block)![1]) }));
+      assert.equal(events[0].type, "snapshot");
+      assert.equal(events.at(-1)?.type, "finished");
+      // The stream polls: cases done before it connects arrive in the snapshot, the rest as `case` events.
+      const status = new Map<string, string>(events[0].data.cases.map((item: { id: string; status: string }) => [item.id, item.status]));
+      for (const event of events.filter((item) => item.type === "case")) status.set(event.data.id, event.data.status);
+      assert.equal(status.size, started.body.total);
+      assert.ok([...status.values()].every((value) => !["queued", "running"].includes(value)), `${events.length} events`);
     });
 
     test("a cancelled run stops after the case in flight, skips the rest and cleans up", async () => {
