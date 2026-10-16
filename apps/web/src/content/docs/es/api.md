@@ -39,6 +39,11 @@ En modo local el API escucha en `http://127.0.0.1:4400`, solo en el loopback y s
 | `POST /v1/runs/:run/cancel` · `POST /v1/runs/:run/replay` | Cancelar o repetir una corrida. |
 | `GET/POST /v1/projects/:project/schedules` · `PATCH/DELETE …/schedules/:schedule` · `POST …/schedules/:schedule/run` | Programaciones: corridas que el API lanza solo. Ver [Programaciones y notificaciones](doc:automatizacion). |
 | `GET/POST /v1/projects/:project/notifications` · `PATCH/DELETE …/notifications/:target` · `POST …/notifications/:target/test` | A dónde se avisa que terminó una corrida (webhook, Slack, email). |
+| `POST /v1/auth/password/forgot` · `POST /v1/auth/password/reset` | Nube. Envía por correo un enlace para restablecer (`{ email }`, siempre **202**); pone la contraseña nueva con él (`{ token, password }`). |
+| `POST /v1/workspace/members/:user/password-reset` | Nube, administrador. El enlace de restablecimiento de un miembro: por correo con SMTP; si no, se devuelve una vez como `token`. |
+| `GET /v1/audit` | Nube, administrador. El registro de auditoría del workspace, lo más reciente primero (`?type=auth.,member.removed`, `?from=2026-10-01`, `?to=`, `?limit=`, `?cursor=`). |
+| `GET /v1/auth/oidc/start` | Nube con `EQ_OIDC_ISSUER`. Lleva el navegador al proveedor de SSO; vuelve por `/v1/auth/oidc/callback`. |
+| `GET /metrics` | Con `EQ_METRICS=true`. Métricas de Prometheus (`Authorization: Bearer $EQ_METRICS_TOKEN` si está). |
 
 Con `expectedRev` evitas pisar cambios de otra persona: si el proyecto cambió desde que lo leíste, la respuesta es **409**.
 
@@ -150,3 +155,13 @@ El API se configura con variables de entorno. Con `pnpm start` (o `pnpm run api`
 | `EQ_PUBLIC_URL` | `http://localhost:<puerto>` en local | La dirección pública de la app web, para los enlaces de las notificaciones. |
 | `EQ_SMTP_HOST` · `EQ_SMTP_PORT` · `EQ_SMTP_SECURE` · `EQ_SMTP_USER` · `EQ_SMTP_PASSWORD` · `EQ_SMTP_FROM` | — · `587` · `true` en 465 | SMTP para las notificaciones por email; sin `EQ_SMTP_HOST` el email no se ofrece. Ver [Despliegue en la nube](doc:deploy). |
 | `EQ_LOG` | — | `debug` para más detalle, `silent` para nada. Por defecto, errores y avisos. |
+| `EQ_PUBLIC_URL` | — | La dirección que abre la gente (`https://eq.example.com`): base de los enlaces de los correos y de la redirección del SSO. Obligatoria con `EQ_SMTP_URL` o `EQ_OIDC_ISSUER`. |
+| `EQ_SMTP_URL` | — | Servidor SMTP para los correos (`smtp://usuario:clave@host:587`, `smtps://…:465`). Sin ella no se envía nada. |
+| `EQ_MAIL_FROM` | `Endpoint Quality <no-reply@localhost>` | Remitente de los correos. |
+| `EQ_METRICS` | `false` | `true` sirve `GET /metrics` para Prometheus. |
+| `EQ_METRICS_TOKEN` | — | Si está, `/metrics` pide `Authorization: Bearer <token>`. |
+| `EQ_OIDC_ISSUER` | — | Proveedor OpenID Connect (`https://accounts.google.com`, `https://login.microsoftonline.com/<tenant>/v2.0`, un realm de Keycloak…): activa el inicio de sesión único. |
+| `EQ_OIDC_CLIENT_ID` · `EQ_OIDC_CLIENT_SECRET` | — | El cliente registrado en el proveedor. Sin secreto, un cliente público (solo PKCE). |
+| `EQ_OIDC_ALLOWED_DOMAINS` | — | Dominios de correo que pueden entrar con SSO, separados por comas (`example.com,example.org`). Vacía: cualquiera. |
+| `EQ_OIDC_NAME` | `SSO` | El nombre del proveedor en el botón de inicio de sesión. |
+| `EQ_OIDC_SCOPES` | `openid email profile` | Scopes que se piden. |

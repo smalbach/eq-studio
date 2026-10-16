@@ -6,6 +6,8 @@
 # Open http://localhost:4400 and create the first account: it becomes the owner of its workspace,
 # and everyone after it joins by invitation (EQ_REGISTRATION=open to let anyone register).
 # Put an HTTPS proxy in front for anything beyond localhost. Database migrations run on start.
+# Optional: email (password reset links), single sign-on (OpenID Connect) and Prometheus metrics,
+# all from docker/.env — see docker/.env.example and the deploy guide (Learn → Cloud deployment).
 # Back up the database with:
 #   docker compose -f docker/compose.yml exec -T postgres pg_dump -U eq eq > eq-backup.sql
 name: endpoint-quality
@@ -28,6 +30,20 @@ services:
       EQ_ALLOW_PRIVATE_TARGETS: ${EQ_ALLOW_PRIVATE_TARGETS:-false}
       EQ_CORS_ORIGINS: ${EQ_CORS_ORIGINS:-}
       EQ_RUN_CONCURRENCY: ${EQ_RUN_CONCURRENCY:-2}
+      # The address people open (https://eq.example.com): base of emailed links and of the SSO redirect.
+      EQ_PUBLIC_URL: ${EQ_PUBLIC_URL:-}
+      # Email. Without EQ_SMTP_URL nothing is sent (and "Forgot password" cannot reach anyone).
+      EQ_SMTP_URL: ${EQ_SMTP_URL:-}
+      EQ_MAIL_FROM: ${EQ_MAIL_FROM:-Endpoint Quality <no-reply@localhost>}
+      # Prometheus: GET /metrics, off unless "true"; with a token it needs "Authorization: Bearer <token>".
+      EQ_METRICS: ${EQ_METRICS:-false}
+      EQ_METRICS_TOKEN: ${EQ_METRICS_TOKEN:-}
+      # Single sign-on with an OpenID Connect provider; empty EQ_OIDC_ISSUER turns it off.
+      EQ_OIDC_ISSUER: ${EQ_OIDC_ISSUER:-}
+      EQ_OIDC_CLIENT_ID: ${EQ_OIDC_CLIENT_ID:-}
+      EQ_OIDC_CLIENT_SECRET: ${EQ_OIDC_CLIENT_SECRET:-}
+      EQ_OIDC_ALLOWED_DOMAINS: ${EQ_OIDC_ALLOWED_DOMAINS:-}
+      EQ_OIDC_NAME: ${EQ_OIDC_NAME:-SSO}
     depends_on:
       postgres: { condition: service_healthy }
       redis: { condition: service_started }

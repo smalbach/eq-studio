@@ -39,6 +39,11 @@ In local mode the API listens on `http://127.0.0.1:4400`, on the loopback only a
 | `POST /v1/runs/:run/cancel` · `POST /v1/runs/:run/replay` | Cancel or repeat a run. |
 | `GET/POST /v1/projects/:project/schedules` · `PATCH/DELETE …/schedules/:schedule` · `POST …/schedules/:schedule/run` | Schedules: runs the API starts on its own. See [Schedules and notifications](doc:automatizacion). |
 | `GET/POST /v1/projects/:project/notifications` · `PATCH/DELETE …/notifications/:target` · `POST …/notifications/:target/test` | Where a finished run is announced (webhook, Slack, email). |
+| `POST /v1/auth/password/forgot` · `POST /v1/auth/password/reset` | Cloud. Emails a reset link (`{ email }`, always **202**); sets the new password with it (`{ token, password }`). |
+| `POST /v1/workspace/members/:user/password-reset` | Cloud, admin. A member's reset link: emailed with SMTP, otherwise returned once as `token`. |
+| `GET /v1/audit` | Cloud, admin. The workspace's audit log, newest first (`?type=auth.,member.removed`, `?from=2026-10-01`, `?to=`, `?limit=`, `?cursor=`). |
+| `GET /v1/auth/oidc/start` | Cloud with `EQ_OIDC_ISSUER`. Sends the browser to the SSO provider; it returns to `/v1/auth/oidc/callback`. |
+| `GET /metrics` | With `EQ_METRICS=true`. Prometheus metrics (`Authorization: Bearer $EQ_METRICS_TOKEN` if set). |
 
 With `expectedRev` you avoid overwriting someone else's change: if the project changed since you read it, the answer is **409**.
 
@@ -150,3 +155,13 @@ The API is configured with environment variables. With `pnpm start` (or `pnpm ru
 | `EQ_PUBLIC_URL` | `http://localhost:<port>` locally | The web app's public address, for the links in notifications. |
 | `EQ_SMTP_HOST` · `EQ_SMTP_PORT` · `EQ_SMTP_SECURE` · `EQ_SMTP_USER` · `EQ_SMTP_PASSWORD` · `EQ_SMTP_FROM` | — · `587` · `true` on 465 | SMTP for email notifications; without `EQ_SMTP_HOST` email is not offered. See [Cloud deployment](doc:deploy). |
 | `EQ_LOG` | — | `debug` for more detail, `silent` for nothing. By default, errors and warnings. |
+| `EQ_PUBLIC_URL` | — | The address people open (`https://eq.example.com`): base of the links in emails and of the SSO redirect. Required with `EQ_SMTP_URL` or `EQ_OIDC_ISSUER`. |
+| `EQ_SMTP_URL` | — | SMTP server for emails (`smtp://user:pass@host:587`, `smtps://…:465`). Without it, nothing is sent. |
+| `EQ_MAIL_FROM` | `Endpoint Quality <no-reply@localhost>` | Sender of the emails. |
+| `EQ_METRICS` | `false` | `true` serves `GET /metrics` for Prometheus. |
+| `EQ_METRICS_TOKEN` | — | If set, `/metrics` needs `Authorization: Bearer <token>`. |
+| `EQ_OIDC_ISSUER` | — | OpenID Connect provider (`https://accounts.google.com`, `https://login.microsoftonline.com/<tenant>/v2.0`, a Keycloak realm…): turns on single sign-on. |
+| `EQ_OIDC_CLIENT_ID` · `EQ_OIDC_CLIENT_SECRET` | — | The client registered with the provider. Without a secret, a public client (PKCE only). |
+| `EQ_OIDC_ALLOWED_DOMAINS` | — | Email domains allowed to sign in with SSO, comma-separated (`example.com,example.org`). Empty: any. |
+| `EQ_OIDC_NAME` | `SSO` | The provider's name on the sign-in button. |
+| `EQ_OIDC_SCOPES` | `openid email profile` | Scopes asked for. |

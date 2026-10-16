@@ -104,7 +104,89 @@ Schedules fire from the API processes themselves, every `EQ_SCHEDULER_TICK_SECON
   private networks, link-local, cloud metadata). It checks the resolved IP, follows at most 3
   redirects and caps time and size. If your deployment lives inside a private network along with
   its APIs, set `EQ_ALLOW_PRIVATE_TARGETS=true`.
-- **Rate limits** on registration, sign-in and invitations, per address and per email.
+- **Rate limits** on registration, sign-in, password resets and invitations, per address and per email.
+- **Audit log** of every security-relevant change, append-only (see [Audit log](#audit-log)).
+
+## Email and forgotten passwords
+
+With an SMTP server the API emails password reset links:
+
+```bash
+EQ_PUBLIC_URL=https://eq.example.com
+EQ_SMTP_URL=smtps://eq%40example.com:app-password@smtp.example.com:465
+EQ_MAIL_FROM="Endpoint Quality <eq@example.com>"
+```
+
+`EQ_PUBLIC_URL` is required with SMTP: the links are built from it, never from the request's
+`Host` header (which a client controls). Characters such as `@` in the user or password are
+URL-encoded (`%40`).
+
+- **Forgot your password?** on the sign-in screen asks for a link. The answer is the same whether
+  the email has an account or not, and it is limited per address and per email.
+- The link is **single use** and lasts **30 minutes**; only its SHA-256 is stored. Using it spends
+  every other link of the account and **closes all its sessions**, as changing the password does.
+- **Settings → Members** lets an admin create a reset link for a member below their role (an owner
+  for anyone). With SMTP it goes to the member's email and is not shown. Without SMTP the admin gets
+  the link to pass on — only if the account belongs to no other workspace.
+- **Without SMTP** nothing is emailed and the API only logs that a reset was asked for. Only the
+  development cloud (`pnpm run cloud`) writes the link itself in its log, as a warning, so the flow
+  can be tried on one machine.
+
+## Single sign-on (OpenID Connect)
+
+Any OpenID Connect provider (Google, Microsoft Entra ID, Okta, Auth0, Keycloak…) can sign people
+in, with authorization code and PKCE:
+
+```bash
+EQ_PUBLIC_URL=https://eq.example.com
+EQ_OIDC_ISSUER=https://accounts.google.com
+EQ_OIDC_CLIENT_ID=…
+EQ_OIDC_CLIENT_SECRET=…
+EQ_OIDC_ALLOWED_DOMAINS=example.com
+EQ_OIDC_NAME=Google
+```
+
+Register `https://eq.example.com/v1/auth/oidc/callback` as the redirect URI with the provider. The
+sign-in screen then shows **Sign in with Google**.
+
+- The account is found by the provider's **verified** email (`email_verified`): an existing account
+  signs in as itself and keeps its password, if it has one.
+- A new email: with `EQ_REGISTRATION=open` it gets an account and a workspace of its own; with
+  `invite` (the default) only someone with a pending invitation gets in, and joins that workspace.
+  The invitation is accepted on the way in.
+- `EQ_OIDC_ALLOWED_DOMAINS` limits SSO to those email domains.
+- The issuer must use HTTPS; plain HTTP is accepted only on `localhost` (a local Keycloak, tests).
+
+## Audit log
+
+**Settings → Audit log** (admins and owners) lists the workspace's security events: sign-ins and
+failed sign-ins, password changes and resets, invitations, members who join or leave, role changes,
+API tokens created and revoked, credentials created, changed or deleted, deleted projects, and
+devices linked or unlinked. Each one with who, on what, from which address and when; never a
+password, a token or a credential's value. Filter by kind and dates; `GET /v1/audit` gives the same
+to scripts.
+
+The log is **append-only**: a trigger in the database refuses to change or delete its rows. It is
+in the backups with everything else.
+
+## Metrics
+
+`EQ_METRICS=true` serves `GET /metrics` in Prometheus format: the process (CPU, memory, event loop,
+GC), HTTP requests by route, method and status with a duration histogram
+(`eq_http_request_duration_seconds`), runs queued, started and finished by status
+(`eq_runs_queued_total`, `eq_runs_started_total`, `eq_runs_finished_total`) and the runs waiting or
+in progress (`eq_run_queue_depth`). It does not need a session; set `EQ_METRICS_TOKEN` to ask for a
+bearer token:
+
+```yaml
+scrape_configs:
+  - job_name: endpoint-quality
+    metrics_path: /metrics
+    authorization: { credentials: "<EQ_METRICS_TOKEN>" }
+    static_configs: [{ targets: ["eq.example.com:4400"] }]
+```
+
+Counters are per process: with several API processes, scrape each one.
 
 ## Operating it
 
@@ -136,4 +218,28 @@ docker compose -f docker/compose.yml --env-file docker/.env up -d --build
 Database migrations run on their own at start, forward only. There is no command to undo them: to
 go back to an earlier version, restore the backup.
 
-Every variable is in the [API reference](doc:api).
+## Variables
+
+Every variable a cloud deployment reads (the local-only ones are in the [API reference](doc:api)):
+
+| Variable | Default | What it does |
+| --- | --- | --- |
+| `EQ_MODE` | `local` | `cloud` for a team deployment. |
+| `EQ_PORT` · `EQ_HOST` | `4400` · `0.0.0.0` | Where it listens. |
+| `EQ_DATABASE_URL` | — | `postgres://…`. Required. |
+| `EQ_DATABASE_SCHEMA` | — | PostgreSQL schema (created if missing). |
+| `EQ_SECRETS_KEY` | — | Encrypts the credentials (`openssl rand -base64 32`). Required; keep it apart from the backups. |
+| `EQ_JWT_SECRET` | — | Signs sessions, at least 32 characters (`openssl rand -base64 48`). Required. |
+| `EQ_REGISTRATION` | `invite` | `invite`: the first account, then invitations. `open`: anyone registers. Also decides who SSO lets in. |
+| `EQ_ACCESS_TTL_SECONDS` · `EQ_REFRESH_TTL_DAYS` | `900` · `30` | Access token and session lifetimes. |
+| `EQ_QUEUE_DRIVER` · `EQ_REDIS_URL` | `memory` · `redis://127.0.0.1:6379` | `redis` for several processes and runs that survive restarts. |
+| `EQ_RUN_CONCURRENCY` | `2` | Simultaneous runs per process. |
+| `EQ_TRUST_PROXY` | — | Proxy hops to trust (`1`), for client addresses (rate limits, audit log) and HTTPS. |
+| `EQ_ALLOW_PRIVATE_TARGETS` | `false` | `true` lets runs reach private addresses. |
+| `EQ_CORS_ORIGINS` | — | Allowed origins if the web app is served elsewhere. |
+| `EQ_PUBLIC_URL` | — | The address people open. Required with SMTP or SSO. |
+| `EQ_SMTP_URL` · `EQ_MAIL_FROM` | — · `Endpoint Quality <no-reply@localhost>` | Email (password reset links). |
+| `EQ_METRICS` · `EQ_METRICS_TOKEN` | `false` · — | `GET /metrics` and its bearer token. |
+| `EQ_OIDC_ISSUER` · `EQ_OIDC_CLIENT_ID` · `EQ_OIDC_CLIENT_SECRET` | — | Single sign-on. |
+| `EQ_OIDC_ALLOWED_DOMAINS` · `EQ_OIDC_NAME` · `EQ_OIDC_SCOPES` | — · `SSO` · `openid email profile` | Allowed email domains, button name, scopes. |
+| `EQ_LOG` | — | `debug` or `silent`. By default, errors and warnings. |
