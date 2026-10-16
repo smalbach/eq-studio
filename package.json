@@ -1,0 +1,45 @@
+{
+  "name": "endpoint-quality-workspace",
+  "version": "0.1.0",
+  "private": true,
+  "engines": {
+    "node": ">=22.18.0"
+  },
+  "scripts": {
+    "dev": "concurrently -k -n api,web,mock,mock-auth \"pnpm --filter @eq/api dev\" \"pnpm --filter @eq/web dev\" \"node apps/mock-target/server.mjs --port 4010\" \"node apps/mock-target/server.mjs --port 4011 --auth\"",
+    "mock": "node apps/mock-target/server.mjs --port 4010",
+    "mock:auth": "node apps/mock-target/server.mjs --port 4011 --auth",
+    "build": "pnpm --filter @eq/web build",
+    "api": "pnpm --filter @eq/api start",
+    "api:dev": "pnpm --filter @eq/api dev",
+    "cloud": "node scripts/cloud-dev.mjs",
+    "start": "pnpm run build && pnpm --filter @eq/api start",
+    "test": "pnpm run test:core && pnpm run test:web && pnpm run test:e2e && pnpm run test:api && pnpm run test:cli",
+    "test:core": "node --test packages/runner-core/test/*.test.ts",
+    "test:web": "pnpm --filter @eq/web test",
+    "test:e2e": "node --test tests/mock-store.e2e.test.mjs",
+    "test:api": "pnpm --filter @eq/api test",
+    "typecheck": "pnpm --filter @eq/web typecheck && pnpm --filter @eq/api typecheck && pnpm --filter endpoint-quality typecheck && pnpm --filter @eq/desktop typecheck",
+    "lint": "eslint . --ignore-pattern dist",
+    "eq": "pnpm --filter endpoint-quality eq",
+    "test:cli": "pnpm --filter endpoint-quality test",
+    "bundle": "pnpm --filter endpoint-quality bundle",
+    "binary": "pnpm --filter endpoint-quality sea",
+    "desktop": "pnpm --filter @eq/desktop start",
+    "desktop:dist": "pnpm --filter @eq/desktop dist"
+  },
+  "devDependencies": {
+    "@eq/runner-core": "workspace:*",
+    "@eslint/js": "9.39.4",
+    "@types/node": "22.19.19",
+    "concurrently": "^9.2.1",
+    "eslint": "9.39.4",
+    "eslint-plugin-jsx-a11y": "6.10.2",
+    "eslint-plugin-react": "7.37.5",
+    "eslint-plugin-react-hooks": "7.1.1",
+    "globals": "16.4.0",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.59.3"
+  },
+  "type": "module"
+}

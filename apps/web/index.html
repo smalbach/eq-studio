@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Functional, load and stress verification of any HTTP API against its OpenAPI contract." />
+    <link rel="icon" href="/favicon.svg" />
+    <title>Endpoint Quality</title>
+    <!-- Theme and language before the first paint: no flash of the wrong theme or language. -->
+    <script>
+      (function () {
+        try {
+          var a = JSON.parse(localStorage.getItem("endpoint-quality:appearance") || "{}") || {};
+          var c = a.theme || localStorage.getItem("endpoint-quality:theme");
+          var d = c === "dark" || (c !== "light" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+          document.documentElement.dataset.theme = d ? "dark" : "light";
+          document.documentElement.className = d ? "dark" : "light";
+          var l = localStorage.getItem("endpoint-quality:locale");
+          if (l === "en" || l === "es") document.documentElement.lang = l;
+        } catch (e) { document.documentElement.dataset.theme = "light"; document.documentElement.className = "light"; }
+      })();
+    </script>
+  </head>
+  <body class="antialiased">
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

@@ -1,0 +1,15 @@
+{
+  "name": "@eq/runner-core",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Framework-free core of Endpoint Quality: scenario generation, execution plan, latency budgets, schema validation and chained flows, all driven by a ProjectConfig.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./load": "./src/load.mjs",
+    "./load-degradation": "./src/load-degradation.mjs"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.ts"
+  }
+}

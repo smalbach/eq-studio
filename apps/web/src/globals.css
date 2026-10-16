@@ -1,0 +1,234 @@
+@layer theme, base, radix, components, utilities;
+@import "tailwindcss";
+@import "@radix-ui/themes/styles.css" layer(radix);
+
+/*
+ * Theme: Radix Themes, tuned by the user (light/dark, accent, gray, radius, scaling, panels) and
+ * saved in localStorage (see lib/theme.ts).
+ *
+ * Radix's styles sit in their own cascade layer between Tailwind's base and its utilities: they
+ * win over the preflight reset, and a `className` on a Radix component still wins over them.
+ *
+ * The screens that are not Radix components yet are written with Tailwind's palette (slate for
+ * ink and surfaces; emerald, rose, amber, sky and violet for state). Instead of a `dark:` twin on
+ * every class, the palette is re-pointed at Radix's colour scales on the theme root, so the same
+ * classes follow light/dark and the chosen gray: slate is the gray scale, the states are fixed
+ * hues (a passed case stays green whatever the accent). The brand colour is `accent-*`.
+ * Tailwind's 50…950 map onto Radix's 12 steps by role: 50–100 backgrounds, 200–300 borders,
+ * 400–600 solid and icons, 700–950 text.
+ *
+ * `.theme-fixed` marks the few surfaces that are dark on purpose in both themes (code blocks,
+ * the execution monitor): inside them Tailwind's original palette is restored.
+ */
+.radix-themes {
+  --default-font-family: "Geist Variable", ui-sans-serif, system-ui, sans-serif;
+  --code-font-family: "Geist Mono Variable", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --background: var(--color-background);
+  --foreground: var(--gray-12);
+  --color-white: var(--color-panel-solid);
+  --color-black: var(--gray-12);
+  --color-slate-50: var(--gray-2);
+  --color-slate-100: var(--gray-3);
+  --color-slate-200: var(--gray-6);
+  --color-slate-300: var(--gray-7);
+  --color-slate-400: var(--gray-9);
+  --color-slate-500: var(--gray-11);
+  --color-slate-600: var(--gray-11);
+  --color-slate-700: color-mix(in oklab, var(--gray-12) 60%, var(--gray-11));
+  --color-slate-800: color-mix(in oklab, var(--gray-12) 85%, var(--gray-11));
+  --color-slate-900: var(--gray-12);
+  --color-slate-950: var(--gray-12);
+  --color-emerald-50: var(--jade-2);
+  --color-emerald-100: var(--jade-3);
+  --color-emerald-200: var(--jade-6);
+  --color-emerald-300: var(--jade-7);
+  --color-emerald-400: var(--jade-8);
+  --color-emerald-500: var(--jade-9);
+  --color-emerald-600: var(--jade-9);
+  --color-emerald-700: var(--jade-11);
+  --color-emerald-800: var(--jade-11);
+  --color-emerald-900: var(--jade-12);
+  --color-emerald-950: var(--jade-12);
+  --color-rose-50: var(--ruby-2);
+  --color-rose-100: var(--ruby-3);
+  --color-rose-200: var(--ruby-6);
+  --color-rose-300: var(--ruby-7);
+  --color-rose-400: var(--ruby-8);
+  --color-rose-500: var(--ruby-9);
+  --color-rose-600: var(--ruby-9);
+  --color-rose-700: var(--ruby-11);
+  --color-rose-800: var(--ruby-11);
+  --color-rose-900: var(--ruby-12);
+  --color-rose-950: var(--ruby-12);
+  --color-amber-50: var(--amber-2);
+  --color-amber-100: var(--amber-3);
+  --color-amber-200: var(--amber-6);
+  --color-amber-300: var(--amber-7);
+  --color-amber-400: var(--amber-8);
+  --color-amber-500: var(--amber-9);
+  --color-amber-600: var(--amber-9);
+  --color-amber-700: var(--amber-11);
+  --color-amber-800: var(--amber-11);
+  --color-amber-900: var(--amber-12);
+  --color-amber-950: var(--amber-12);
+  --color-sky-50: var(--sky-2);
+  --color-sky-100: var(--sky-3);
+  --color-sky-200: var(--sky-6);
+  --color-sky-300: var(--sky-7);
+  --color-sky-400: var(--sky-8);
+  --color-sky-500: var(--sky-9);
+  --color-sky-600: var(--sky-9);
+  --color-sky-700: var(--sky-11);
+  --color-sky-800: var(--sky-11);
+  --color-sky-900: var(--sky-12);
+  --color-sky-950: var(--sky-12);
+  --color-violet-50: var(--violet-2);
+  --color-violet-100: var(--violet-3);
+  --color-violet-200: var(--violet-6);
+  --color-violet-300: var(--violet-7);
+  --color-violet-400: var(--violet-8);
+  --color-violet-500: var(--violet-9);
+  --color-violet-600: var(--violet-9);
+  --color-violet-700: var(--violet-11);
+  --color-violet-800: var(--violet-11);
+  --color-violet-900: var(--violet-12);
+  --color-violet-950: var(--violet-12);
+  /* Chart series, fixed by role; validated for colour-blind separation on each surface. */
+  --chart-blue: #0284c7;
+  --chart-violet: #7c3aed;
+  --chart-amber: #d97706;
+  --chart-rose: #e11d48;
+  --chart-green: #059669;
+  --chart-muted: var(--gray-10);
+  --chart-grid: var(--gray-5);
+  --chart-reference: var(--gray-8);
+  --chart-surface: var(--color-panel-solid);
+}
+
+.dark .radix-themes, .radix-themes.dark {
+  --chart-blue: #0891d2;
+  --chart-violet: #8b5cf6;
+  --chart-green: #10b981;
+}
+
+.theme-fixed {
+  color-scheme: dark;
+
+  --color-white: #fff;
+  --color-black: #000;
+  --color-slate-50: oklch(98.4% 0.003 247.858);
+  --color-slate-100: oklch(96.8% 0.007 247.896);
+  --color-slate-200: oklch(92.9% 0.013 255.508);
+  --color-slate-300: oklch(86.9% 0.022 252.894);
+  --color-slate-400: oklch(70.4% 0.04 256.788);
+  --color-slate-500: oklch(55.4% 0.046 257.417);
+  --color-slate-600: oklch(44.6% 0.043 257.281);
+  --color-slate-700: oklch(37.2% 0.044 257.287);
+  --color-slate-800: oklch(27.9% 0.041 260.031);
+  --color-slate-900: oklch(20.8% 0.042 265.755);
+  --color-slate-950: oklch(12.9% 0.042 264.695);
+  --color-emerald-50: oklch(97.9% 0.021 166.113);
+  --color-emerald-100: oklch(95% 0.052 163.051);
+  --color-emerald-200: oklch(90.5% 0.093 164.15);
+  --color-emerald-300: oklch(84.5% 0.143 164.978);
+  --color-emerald-400: oklch(76.5% 0.177 163.223);
+  --color-emerald-500: oklch(69.6% 0.17 162.48);
+  --color-emerald-600: oklch(59.6% 0.145 163.225);
+  --color-emerald-700: oklch(50.8% 0.118 165.612);
+  --color-emerald-800: oklch(43.2% 0.095 166.913);
+  --color-emerald-900: oklch(37.8% 0.077 168.94);
+  --color-emerald-950: oklch(26.2% 0.051 172.552);
+  --color-rose-50: oklch(96.9% 0.015 12.422);
+  --color-rose-100: oklch(94.1% 0.03 12.58);
+  --color-rose-200: oklch(89.2% 0.058 10.001);
+  --color-rose-300: oklch(81% 0.117 11.638);
+  --color-rose-400: oklch(71.2% 0.194 13.428);
+  --color-rose-500: oklch(64.5% 0.246 16.439);
+  --color-rose-600: oklch(58.6% 0.253 17.585);
+  --color-rose-700: oklch(51.4% 0.222 16.935);
+  --color-rose-800: oklch(45.5% 0.188 13.697);
+  --color-rose-900: oklch(41% 0.159 10.272);
+  --color-rose-950: oklch(27.1% 0.105 12.094);
+  --color-amber-50: oklch(98.7% 0.022 95.277);
+  --color-amber-100: oklch(96.2% 0.059 95.617);
+  --color-amber-200: oklch(92.4% 0.12 95.746);
+  --color-amber-300: oklch(87.9% 0.169 91.605);
+  --color-amber-400: oklch(82.8% 0.189 84.429);
+  --color-amber-500: oklch(76.9% 0.188 70.08);
+  --color-amber-600: oklch(66.6% 0.179 58.318);
+  --color-amber-700: oklch(55.5% 0.163 48.998);
+  --color-amber-800: oklch(47.3% 0.137 46.201);
+  --color-amber-900: oklch(41.4% 0.112 45.904);
+  --color-amber-950: oklch(27.9% 0.077 45.635);
+  --color-sky-50: oklch(97.7% 0.013 236.62);
+  --color-sky-100: oklch(95.1% 0.026 236.824);
+  --color-sky-200: oklch(90.1% 0.058 230.902);
+  --color-sky-300: oklch(82.8% 0.111 230.318);
+  --color-sky-400: oklch(74.6% 0.16 232.661);
+  --color-sky-500: oklch(68.5% 0.169 237.323);
+  --color-sky-600: oklch(58.8% 0.158 241.966);
+  --color-sky-700: oklch(50% 0.134 242.749);
+  --color-sky-800: oklch(44.3% 0.11 240.79);
+  --color-sky-900: oklch(39.1% 0.09 240.876);
+  --color-sky-950: oklch(29.3% 0.066 243.157);
+  --color-violet-50: oklch(96.9% 0.016 293.756);
+  --color-violet-100: oklch(94.3% 0.029 294.588);
+  --color-violet-200: oklch(89.4% 0.057 293.283);
+  --color-violet-300: oklch(81.1% 0.111 293.571);
+  --color-violet-400: oklch(70.2% 0.183 293.541);
+  --color-violet-500: oklch(60.6% 0.25 292.717);
+  --color-violet-600: oklch(54.1% 0.281 293.009);
+  --color-violet-700: oklch(49.1% 0.27 292.581);
+  --color-violet-800: oklch(43.2% 0.232 292.759);
+  --color-violet-900: oklch(38% 0.189 293.745);
+  --color-violet-950: oklch(28.3% 0.141 291.089);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  /* The chosen accent, for the places that are not a Radix component: `bg-accent-9`, `text-accent-11`… */
+  --color-accent-1: var(--accent-1); --color-accent-2: var(--accent-2); --color-accent-3: var(--accent-3); --color-accent-4: var(--accent-4);
+  --color-accent-5: var(--accent-5); --color-accent-6: var(--accent-6); --color-accent-7: var(--accent-7); --color-accent-8: var(--accent-8);
+  --color-accent-9: var(--accent-9); --color-accent-10: var(--accent-10); --color-accent-11: var(--accent-11); --color-accent-12: var(--accent-12);
+  --color-accent-contrast: var(--accent-contrast);
+  --color-panel: var(--color-panel-solid);
+  --font-sans: "Geist Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Geist Mono Variable", ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+body {
+  background: var(--color-background);
+  color: var(--gray-12);
+  font-family: "Geist Variable", ui-sans-serif, system-ui, Arial, Helvetica, sans-serif;
+}
+
+/* The run panel slides in over the list it was opened from. */
+@keyframes panel-in {
+  from { transform: translateX(24px); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+.panel-in { animation: panel-in 160ms ease-out; }
+@media (prefers-reduced-motion: reduce) { .panel-in { animation: none; } }
+
+/*
+ * Print. Every screen prints as a report: always on the light palette (paper is white), without
+ * the header, the buttons or the filters, with scrolled areas expanded and cards kept whole when
+ * they fit on a page. With a run open in its panel, only the panel prints.
+ */
+@media print {
+  @page { margin: 12mm; }
+  :root { --background: #ffffff; }
+  * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body { overflow: visible !important; font-size: 11px; }
+  .shadow-sm, .shadow-lg, .shadow-2xl { box-shadow: none !important; }
+  .rounded-xl, .rounded-2xl, figure, tr { break-inside: avoid; }
+  .overflow-auto, .overflow-x-auto, .overflow-y-auto, .overflow-hidden { overflow: visible !important; }
+  [class*="max-h-"] { max-height: none !important; }
+
+  html[data-print-panel] main > div > :not([data-print-root]):not([data-print-keep]) { display: none !important; }
+  [data-print-root] { position: static !important; }
+  [data-print-root] > button { display: none !important; }
+  [data-print-root] > section { position: static !important; display: block !important; max-width: none !important; animation: none !important; }
+  [data-print-root] > section > div { overflow: visible !important; padding: 0 !important; }
+}

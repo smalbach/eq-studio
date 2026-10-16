@@ -1,0 +1,5 @@
+**/node_modules
+**/dist
+apps/cli/build
+.git
+*.tgz

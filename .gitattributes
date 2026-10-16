@@ -1,0 +1,6 @@
+# Same bytes on macOS, Linux and Windows: text files are stored and checked out with LF, so a
+# Windows checkout does not turn every file (and every snapshot or golden) into a diff.
+* text=auto eol=lf
+*.wasm binary
+*.png binary
+*.ico binary

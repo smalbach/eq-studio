@@ -1,0 +1,36 @@
+{
+  "name": "endpoint-quality",
+  "version": "0.1.0",
+  "description": "Endpoint Quality: functional, load and stress verification of any HTTP API against its OpenAPI contract. The app, the API and the `eq` command line in one package.",
+  "license": "UNLICENSED",
+  "type": "module",
+  "bin": {
+    "eq": "./bin/eq.mjs",
+    "endpoint-quality": "./bin/eq.mjs"
+  },
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "scripts": {
+    "eq": "tsx src/entry.ts",
+    "bundle": "node scripts/bundle.mjs",
+    "sea": "node scripts/sea.mjs",
+    "test": "node --import tsx --test test/*.test.ts",
+    "typecheck": "tsc --noEmit -p .",
+    "prepack": "node scripts/bundle.mjs"
+  },
+  "devDependencies": {
+    "@eq/api": "workspace:*",
+    "@eq/runner-core": "workspace:*",
+    "@types/node": "22.19.19",
+    "esbuild": "0.28.2",
+    "postject": "1.0.0-alpha.6",
+    "tsx": "4.23.15",
+    "typescript": "5.9.3"
+  },
+  "files": [
+    "bin",
+    "dist",
+    "README.md"
+  ]
+}

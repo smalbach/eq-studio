@@ -1,0 +1,18 @@
+{
+  "name": "@eq/mock-target",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A fictional store API with zero dependencies, used to exercise Endpoint Quality end to end.",
+  "type": "module",
+  "exports": {
+    ".": "./server.mjs",
+    "./openapi": "./openapi.mjs"
+  },
+  "bin": {
+    "eq-mock-target": "./server.mjs"
+  },
+  "scripts": {
+    "start": "node server.mjs --port 4010",
+    "start:auth": "node server.mjs --port 4011 --auth"
+  }
+}

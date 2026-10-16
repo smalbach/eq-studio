@@ -1,0 +1,56 @@
+# The hosted setup on one machine: the API (with the web app), PostgreSQL and Redis.
+#
+#   cp docker/.env.example docker/.env      # then set the two secrets in it
+#   docker compose -f docker/compose.yml --env-file docker/.env up -d
+#
+# Open http://localhost:4400 and create the first account: it becomes the owner of its workspace,
+# and everyone after it joins by invitation (EQ_REGISTRATION=open to let anyone register).
+# Put an HTTPS proxy in front for anything beyond localhost. Database migrations run on start.
+# Back up the database with:
+#   docker compose -f docker/compose.yml exec -T postgres pg_dump -U eq eq > eq-backup.sql
+name: endpoint-quality
+
+services:
+  api:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    ports: ["4400:4400"]
+    environment:
+      EQ_MODE: cloud
+      EQ_DATABASE_URL: postgres://eq:${POSTGRES_PASSWORD:-eq}@postgres:5432/eq
+      EQ_QUEUE_DRIVER: redis
+      EQ_REDIS_URL: redis://redis:6379
+      EQ_SECRETS_KEY: ${EQ_SECRETS_KEY:?set EQ_SECRETS_KEY in docker/.env}
+      EQ_JWT_SECRET: ${EQ_JWT_SECRET:?set EQ_JWT_SECRET in docker/.env}
+      EQ_REGISTRATION: ${EQ_REGISTRATION:-invite}
+      EQ_TRUST_PROXY: ${EQ_TRUST_PROXY:-}
+      EQ_ALLOW_PRIVATE_TARGETS: ${EQ_ALLOW_PRIVATE_TARGETS:-false}
+      EQ_CORS_ORIGINS: ${EQ_CORS_ORIGINS:-}
+      EQ_RUN_CONCURRENCY: ${EQ_RUN_CONCURRENCY:-2}
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_started }
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: eq
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-eq}
+      POSTGRES_DB: eq
+    volumes: ["postgres:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U eq"]
+      interval: 5s
+      retries: 20
+    restart: unless-stopped
+
+  redis:
+    image: redis:7
+    volumes: ["redis:/data"]
+    restart: unless-stopped
+
+volumes:
+  postgres:
+  redis:

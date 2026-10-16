@@ -1,0 +1,30 @@
+# Installers for each platform, built on that platform (CI does it on macOS, Windows and Linux):
+#   macOS    .dmg and .zip         Windows  NSIS installer (.exe)      Linux  .AppImage and .deb
+# Everything the app runs is bundled in dist/ (scripts/build.mjs); there are no node_modules.
+appId: dev.endpointquality.desktop
+productName: Endpoint Quality
+artifactName: endpoint-quality-${version}-${os}-${arch}.${ext}
+copyright: Endpoint Quality
+directories:
+  output: release
+  buildResources: build
+files:
+  - dist/**/*
+  - package.json
+npmRebuild: false
+mac:
+  category: public.app-category.developer-tools
+  target: [dmg, zip]
+  # Ad hoc: enough to run on Apple Silicon. A public release adds a Developer ID and notarization.
+  identity: "-"
+  # Hardened runtime belongs with a Developer ID; with an ad hoc signature it blocks launch.
+  hardenedRuntime: false
+win:
+  target: [nsis]
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+linux:
+  category: Development
+  target: [AppImage, deb]
+  maintainer: Endpoint Quality <noreply@endpointquality.dev>

@@ -1,0 +1,120 @@
+/**
+ * `eq` — the Endpoint Quality command line.
+ *
+ *   eq serve                     the app and the API on http://127.0.0.1:4400
+ *   eq run <project> --env <e>   a functional run; exit code 0/1 for CI
+ *   eq run --file p.eq.json      the same, without any server running
+ *   eq load …                    a load, stress, spike or soak test
+ *   eq mock                      the example API the Mock Store project runs against
+ *   eq projects | export | import
+ *   eq login <url> | sync | logout   this installation and a cloud workspace
+ */
+import { parseArgs } from "node:util";
+import { CliError, EXIT } from "./client.ts";
+import { exportProject, importProject, load, mock, projects, run, serve, type Flags } from "./commands.ts";
+import { red } from "./report.ts";
+import { login, logout, sync } from "./sync.ts";
+import { VERSION } from "./runtime.ts";
+
+const HELP = `Endpoint Quality ${VERSION} — verify any HTTP API against its OpenAPI contract.
+
+Usage
+  eq serve [--port 4400] [--host 127.0.0.1] [--open]
+      The web app and the API. Data in ~/.endpoint-quality (EQ_DATA_DIR to change it); port and
+      host also from EQ_PORT and EQ_HOST. Local mode has no sign-in: keep it on the loopback.
+      With EQ_MODE=cloud it reads the hosted configuration from the environment instead and
+      listens on 0.0.0.0 (EQ_DATABASE_URL, EQ_SECRETS_KEY, EQ_JWT_SECRET, EQ_QUEUE_DRIVER… see
+      the app's documentation, "Cloud deployment").
+
+  eq run <project> --env <environment> [options]
+  eq run -f <project.eq.json> [-e <environment>] [--base-url <url>] [options]
+      A functional run. With --file the project is loaded into an API started for this run
+      only: nothing has to be installed or running (CI). Otherwise it runs on the API at
+      --api (EQ_API_URL, default http://127.0.0.1:4400); a hosted one needs --api-token
+      (EQ_API_TOKEN, from Settings → API tokens) and, for a session token, --workspace
+      (EQ_WORKSPACE).
+        --read-only            only the GET operations
+        --auth | --no-auth     run (or not) the 401/403 cases, whatever the environment says
+        --endpoints a,b        only these operations
+        --token T              primary bearer token            (or EQ_TOKEN)
+        --read-token T         insufficient-permission token   (or EQ_READ_TOKEN)
+        --api-key K            alternate API key               (or EQ_API_KEY; --api-key-header)
+        --samples N --delay MS --locale en|es --scope "name"
+        --junit report.xml     JUnit XML for the CI's test view
+        --json run.json        the full run as JSON
+        --format text|json     what is printed (default text)
+        -q, --quiet            no progress, only the result
+        --fail-on-blocked      exit 1 when writes were blocked by the environment
+
+  eq load <project> --env <environment> [--type load|stress|spike|soak] [--rps 10] [--peak 50]
+          [--duration 30] [--mix <id>] [--p95 <ms>] [--no-latency] [--preflight stop|skip|ignore]
+      A load test (also with --file and --base-url). Exit 1 when its verdict fails.
+      --junit, --json, --format and --locale work as for eq run (one JUnit case per criterion).
+
+  eq mock [--port 4010]             the example API (a fictional store) for the Mock Store project:
+                                    no auth on 4010, with auth on 4011 (Bearer admin-token)
+
+  eq projects [--format json]       the projects of the API
+  eq export <project> [-o file]     a project as a .eq.json file
+  eq import <file.eq.json>          a .eq.json file as a new project
+
+  eq login <cloud-url> [--name "Work laptop"] [--no-open] [--token eqt_…]
+      Links this installation to a cloud workspace: it shows a code to approve in the browser
+      (or takes an API token: --token or EQ_SYNC_TOKEN), then syncs for the first time.
+  eq sync [--status] [--runs on|off] [--projects a,b|all] [--secrets on|off]
+      Pull, then push. --secrets on reads the passphrase from EQ_SYNC_PASSPHRASE and from then
+      on credentials travel encrypted end to end. Exit 1 when a conflict or a refused change
+      waits for someone. While "eq serve" runs it also syncs every 5 minutes
+      (EQ_SYNC_INTERVAL_SECONDS; 0 turns it off).
+  eq logout                         unlinks (the data stays here; the device's token is revoked)
+
+Exit codes: 0 passed · 1 cases failed · 2 wrong command, project or environment · 3 could not run.
+`;
+
+export async function main(argv: string[]): Promise<number> {
+  const { values, positionals } = parseArgs({
+    args: argv,
+    allowPositionals: true,
+    strict: true,
+    options: {
+      help: { type: "boolean", short: "h" }, version: { type: "boolean", short: "v" },
+      port: { type: "string" }, host: { type: "string" }, open: { type: "boolean" }, api: { type: "string" }, "api-token": { type: "string" }, workspace: { type: "string" },
+      file: { type: "string", short: "f" }, env: { type: "string", short: "e" }, "base-url": { type: "string" },
+      "read-only": { type: "boolean" }, auth: { type: "boolean" }, "no-auth": { type: "boolean" }, endpoints: { type: "string" },
+      token: { type: "string" }, "read-token": { type: "string" }, "api-key": { type: "string" }, "api-key-header": { type: "string" },
+      samples: { type: "string" }, delay: { type: "string" }, locale: { type: "string" }, scope: { type: "string" },
+      junit: { type: "string" }, json: { type: "string" }, format: { type: "string" }, quiet: { type: "boolean", short: "q" }, "fail-on-blocked": { type: "boolean" },
+      type: { type: "string" }, rps: { type: "string" }, peak: { type: "string" }, duration: { type: "string" }, mix: { type: "string" }, p95: { type: "string" }, "no-latency": { type: "boolean" }, preflight: { type: "string" },
+      output: { type: "string", short: "o" },
+      name: { type: "string" }, "no-open": { type: "boolean" }, status: { type: "boolean" }, runs: { type: "string" }, projects: { type: "string" }, secrets: { type: "string" },
+    },
+  });
+  const flags = values as Flags;
+  const [command, argument] = positionals;
+  if (values.version) { process.stdout.write(`${VERSION}\n`); return EXIT.ok; }
+  if (values.help || !command || command === "help") { process.stdout.write(HELP); return command || values.help ? EXIT.ok : EXIT.usage; }
+  switch (command) {
+    case "serve": return serve(flags);
+    case "run": return run(argument, flags);
+    case "load": return load(argument, flags);
+    case "projects": return projects(flags);
+    case "mock": return mock(flags);
+    case "export": return exportProject(argument, flags);
+    case "import": return importProject(argument, flags);
+    case "login": return login(argument, flags);
+    case "sync": return sync(flags);
+    case "logout": return logout(flags);
+    default: throw new CliError(`Unknown command "${command}". eq --help lists them.`, EXIT.usage);
+  }
+}
+
+/** Runs the CLI and exits with its code. Kept apart from `main` so tests call `main` directly. */
+export async function cli(argv = process.argv.slice(2)) {
+  try {
+    process.exitCode = await main(argv);
+  } catch (error) {
+    const code = error instanceof CliError ? error.exitCode : error instanceof TypeError && "code" in error && String(error.code).startsWith("ERR_PARSE_ARGS") ? EXIT.usage : EXIT.error;
+    process.stderr.write(`${red("error")} ${error instanceof Error ? error.message : String(error)}\n`);
+    process.exitCode = code;
+  }
+}

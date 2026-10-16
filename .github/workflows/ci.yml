@@ -1,0 +1,101 @@
+# Every push and pull request, on the three operating systems the product promises to run on.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: ${{ matrix.os }} · Node ${{ matrix.node }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        node: [22, 24]
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run typecheck
+      - run: pnpm run lint
+        if: matrix.os == 'ubuntu-latest' && matrix.node == 24
+      # Everything but the API suite, which needs the web build and runs below.
+      - run: pnpm run test:core && pnpm run test:web && pnpm run test:e2e && pnpm run test:cli
+      - run: pnpm run test:api
+      - name: Bundle and run the bundled CLI against the example API
+        run: |
+          pnpm run bundle
+          node apps/mock-target/server.mjs --port 4010 &
+          sleep 1
+          node apps/cli/dist/eq.cjs run --file examples/mock-store/mock-store.eq.json --env local --junit eq-report.xml
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: eq-report-${{ matrix.os }}-node${{ matrix.node }}
+          path: eq-report.xml
+          if-no-files-found: ignore
+
+  # The API on PostgreSQL and the run queue on Redis, the cloud configuration, on Linux.
+  cloud-services:
+    name: API on PostgreSQL and Redis
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: eq
+          POSTGRES_PASSWORD: eq
+          POSTGRES_DB: eq
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U eq" --health-interval 5s --health-timeout 5s --health-retries 10
+      redis:
+        image: redis:7
+        ports: ["6379:6379"]
+    env:
+      EQ_TEST_POSTGRES_URL: postgres://eq:eq@127.0.0.1:5432/eq
+      EQ_TEST_REDIS_URL: redis://127.0.0.1:6379
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run test:api
+
+  docker:
+    name: Docker image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the image
+        run: docker build -t endpoint-quality:ci .
+      - name: Start it with PostgreSQL and Redis and check it answers
+        run: |
+          printf 'EQ_SECRETS_KEY=%s\nEQ_JWT_SECRET=%s\n' "$(openssl rand -base64 32)" "$(openssl rand -base64 48)" > docker/.env
+          docker compose -f docker/compose.yml --env-file docker/.env up -d --build
+          for i in $(seq 1 60); do curl -fs http://localhost:4400/health && break; sleep 2; done
+          curl -fs http://localhost:4400/health | grep '"auth":"required"'
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:4400/v1/projects)" = 401
+      - if: always()
+        run: docker compose -f docker/compose.yml logs api

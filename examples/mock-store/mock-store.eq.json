@@ -1,0 +1,391 @@
+{
+  "format": "endpoint-quality/project",
+  "version": 1,
+  "project": {
+    "name": "Mock Store",
+    "contractVersion": "1.0.0",
+    "operations": [
+      {
+        "id": "healthCheck",
+        "method": "GET",
+        "path": "/health",
+        "summary": "Liveness probe",
+        "tag": "health",
+        "statuses": [200],
+        "parameters": []
+      },
+      {
+        "id": "listProducts",
+        "method": "GET",
+        "path": "/v1/products",
+        "summary": "List products",
+        "tag": "products",
+        "statuses": [200, 401, 422],
+        "parameters": ["limit", "cursor", "q", "category", "sku"]
+      },
+      {
+        "id": "createProduct",
+        "method": "POST",
+        "path": "/v1/products",
+        "summary": "Create a product",
+        "tag": "products",
+        "statuses": [201, 401, 403, 409, 422],
+        "parameters": []
+      },
+      {
+        "id": "bulkUpsertProducts",
+        "method": "POST",
+        "path": "/v1/products/bulk",
+        "summary": "Create or update products by SKU",
+        "tag": "products",
+        "statuses": [200, 401, 403, 422],
+        "parameters": []
+      },
+      {
+        "id": "getProduct",
+        "method": "GET",
+        "path": "/v1/products/{product_id}",
+        "summary": "Read a product",
+        "tag": "products",
+        "statuses": [200, 401, 404],
+        "parameters": ["product_id"]
+      },
+      {
+        "id": "replaceProduct",
+        "method": "PUT",
+        "path": "/v1/products/{product_id}",
+        "summary": "Replace a product",
+        "tag": "products",
+        "statuses": [200, 401, 403, 404, 409, 422],
+        "parameters": ["product_id"]
+      },
+      {
+        "id": "updateProduct",
+        "method": "PATCH",
+        "path": "/v1/products/{product_id}",
+        "summary": "Update some fields of a product",
+        "tag": "products",
+        "statuses": [200, 401, 403, 404, 409, 422],
+        "parameters": ["product_id"]
+      },
+      {
+        "id": "deleteProduct",
+        "method": "DELETE",
+        "path": "/v1/products/{product_id}",
+        "summary": "Delete a product and its reviews",
+        "tag": "products",
+        "statuses": [204, 401, 403, 404],
+        "parameters": ["product_id"]
+      },
+      {
+        "id": "listProductReviews",
+        "method": "GET",
+        "path": "/v1/products/{product_id}/reviews",
+        "summary": "List a product's reviews",
+        "tag": "reviews",
+        "statuses": [200, 401, 404, 422],
+        "parameters": ["product_id", "limit", "cursor"]
+      },
+      {
+        "id": "createProductReview",
+        "method": "POST",
+        "path": "/v1/products/{product_id}/reviews",
+        "summary": "Review a product",
+        "tag": "reviews",
+        "statuses": [201, 401, 403, 404, 422],
+        "parameters": ["product_id"]
+      },
+      {
+        "id": "getProductReview",
+        "method": "GET",
+        "path": "/v1/products/{product_id}/reviews/{review_id}",
+        "summary": "Read a review",
+        "tag": "reviews",
+        "statuses": [200, 401, 404],
+        "parameters": ["product_id", "review_id"]
+      },
+      {
+        "id": "deleteProductReview",
+        "method": "DELETE",
+        "path": "/v1/products/{product_id}/reviews/{review_id}",
+        "summary": "Delete a review",
+        "tag": "reviews",
+        "statuses": [204, 401, 403, 404],
+        "parameters": ["product_id", "review_id"]
+      },
+      {
+        "id": "listStores",
+        "method": "GET",
+        "path": "/v1/stores",
+        "summary": "List stores, optionally around a point",
+        "tag": "stores",
+        "statuses": [200, 401, 422],
+        "parameters": ["limit", "cursor", "lat", "lon", "radius_km"]
+      },
+      {
+        "id": "createStore",
+        "method": "POST",
+        "path": "/v1/stores",
+        "summary": "Create a store",
+        "tag": "stores",
+        "statuses": [201, 401, 403, 409, 422],
+        "parameters": []
+      },
+      {
+        "id": "getStore",
+        "method": "GET",
+        "path": "/v1/stores/{store_id}",
+        "summary": "Read a store",
+        "tag": "stores",
+        "statuses": [200, 401, 404],
+        "parameters": ["store_id"]
+      },
+      {
+        "id": "replaceStore",
+        "method": "PUT",
+        "path": "/v1/stores/{store_id}",
+        "summary": "Replace a store",
+        "tag": "stores",
+        "statuses": [200, 401, 403, 404, 409, 422],
+        "parameters": ["store_id"]
+      },
+      {
+        "id": "updateStore",
+        "method": "PATCH",
+        "path": "/v1/stores/{store_id}",
+        "summary": "Update some fields of a store",
+        "tag": "stores",
+        "statuses": [200, 401, 403, 404, 409, 422],
+        "parameters": ["store_id"]
+      },
+      {
+        "id": "deleteStore",
+        "method": "DELETE",
+        "path": "/v1/stores/{store_id}",
+        "summary": "Delete a store",
+        "tag": "stores",
+        "statuses": [204, 401, 403, 404],
+        "parameters": ["store_id"]
+      }
+    ],
+    "bodies": {
+      "createProduct": { "body": { "sku": "EQ-TEST-0001", "name": "Test Lamp", "category": "lighting", "price": 31.5, "stock": 7 } },
+      "bulkUpsertProducts": { "body": { "records": [{ "sku": "EQ-BULK-0001", "name": "Bulk Test Tray", "category": "kitchen", "price": 14, "stock": 3 }] } },
+      "replaceProduct": {
+        "body": { "sku": "EQ-TEST-0001", "name": "Test Lamp", "category": "lighting", "price": 31.5, "stock": 7 },
+        "replaceBody": { "sku": "EQ-TEST-0002", "name": "Test Lamp, replaced", "category": "lighting", "price": 35, "stock": 2 }
+      },
+      "updateProduct": { "body": { "price": 27.25 } },
+      "createProductReview": { "body": { "rating": 4, "author": "Test Reviewer", "comment": "Created by the test matrix.", "store_id": 1 } },
+      "createStore": { "body": { "name": "EQ Test Store", "address": "1 Test Avenue", "lat": 40.1, "lon": -100.1, "phone": "+1 555 0190" } },
+      "replaceStore": {
+        "body": { "name": "EQ Test Store", "address": "1 Test Avenue", "lat": 40.1, "lon": -100.1, "phone": "+1 555 0190" },
+        "replaceBody": { "name": "EQ Test Store (replaced)", "address": "9 Test Avenue", "lat": 40.11, "lon": -100.11, "phone": null }
+      },
+      "updateStore": { "body": { "phone": "+1 555 0191" } }
+    },
+    "parameterSamples": {
+      "limit": [
+        { "value": "10" },
+        {
+          "value": "0",
+          "expectedStatus": 422,
+          "description": {
+            "es": "Fuera del rango 1..100: debe rechazarse con 422, no recortarse en silencio.",
+            "en": "Outside 1..100: must be rejected with 422, not silently clamped."
+          }
+        },
+        {
+          "value": "101",
+          "expectedStatus": 422,
+          "description": {
+            "es": "Fuera del rango 1..100: debe rechazarse con 422, no recortarse en silencio.",
+            "en": "Outside 1..100: must be rejected with 422, not silently clamped."
+          }
+        }
+      ],
+      "cursor": [
+        {
+          "value": "eyJvZmZzZXQiOjJ9",
+          "description": {
+            "es": "Un cursor válido (offset 2) emitido por la propia API: la segunda página.",
+            "en": "A valid cursor (offset 2) issued by the API itself: the second page."
+          }
+        }
+      ],
+      "q": [
+        {
+          "value": "lamp",
+          "description": { "es": "Búsqueda de texto con resultados en el seed.", "en": "Text search with matches in the seed." }
+        },
+        {
+          "value": "zzz-nothing",
+          "description": {
+            "es": "Búsqueda sin coincidencias: 200 con lista vacía, nunca 404.",
+            "en": "Search with no match: 200 with an empty list, never 404."
+          }
+        }
+      ],
+      "category": [
+        { "value": "lighting" },
+        {
+          "value": "no-such-category",
+          "description": {
+            "es": "Una categoría que no existe filtra a vacío; no se ignora.",
+            "en": "A category that does not exist filters to empty; it is not ignored."
+          }
+        }
+      ],
+      "sku": [
+        {
+          "value": "SKU-0001",
+          "description": { "es": "Clave natural exacta: cero o un producto.", "en": "Exact natural key: zero or one product." }
+        }
+      ]
+    },
+    "plugins": {
+      "geo": {
+        "lat": "lat",
+        "lon": "lon",
+        "radius": "radius_km",
+        "center": { "lat": "40.0000", "lon": "-100.0000" },
+        "radiiKm": ["1", "20"],
+        "emptyPoint": { "lat": "0", "lon": "0" },
+        "loneRadiusKm": "5",
+        "invalidStatus": 422
+      },
+      "pagination": { "cursorParam": "cursor", "invalidValue": "%%invalid-cursor%%", "expectedStatus": 422 }
+    },
+    "auth": {
+      "publicOperations": ["healthCheck"],
+      "insufficientScope": { "default": "catalog:read" },
+      "apiKeyHeader": "X-API-Key",
+      "alternate": {
+        "methods": ["DELETE"],
+        "expectedStatus": 401,
+        "name": { "es": "API key en un DELETE", "en": "API key on a DELETE" },
+        "description": {
+          "es": "Los DELETE solo aceptan token bearer: una API key válida debe recibir 401 (credencial no aceptada), no 403 ni 204.",
+          "en": "DELETE only accepts a bearer token: a valid API key must get 401 (credential not accepted), not 403 nor 204."
+        }
+      }
+    },
+    "budgets": [
+      { "path": "/health", "ms": 50, "label": { "es": "Health < 50 ms", "en": "Health < 50 ms" }, "source": "mock-store" },
+      {
+        "methods": ["POST"],
+        "path": "**/bulk",
+        "ms": 2000,
+        "label": { "es": "Bulk < 2000 ms", "en": "Bulk < 2000 ms" },
+        "source": "mock-store"
+      },
+      { "methods": ["GET"], "ms": 200, "label": { "es": "GET p95 < 200 ms", "en": "GET p95 < 200 ms" }, "source": "mock-store" },
+      { "methods": ["POST", "PUT", "PATCH", "DELETE"], "ms": null }
+    ],
+    "envelope": { "dataKey": "data", "idFallbackKey": "id" },
+    "bulk": {
+      "recordsKey": "records",
+      "lookups": { "/v1/products/bulk": { "list": "/v1/products", "keys": ["sku"], "id": "product_id", "item": "/v1/products/{product_id}" } }
+    },
+    "seed": {
+      "sources": [
+        { "name": "product_id", "path": "/v1/products?limit=4", "operationPath": "/v1/products" },
+        { "name": "store_id", "path": "/v1/stores?limit=4", "operationPath": "/v1/stores" },
+        {
+          "name": "review_id",
+          "path": "/v1/products/{product_id}/reviews?limit=4",
+          "operationPath": "/v1/products/{product_id}/reviews",
+          "needs": "product_id"
+        }
+      ],
+      "mappedRows": 4,
+      "bodyIdFields": ["store_id"]
+    }
+  },
+  "environments": [
+    {
+      "id": "local",
+      "name": "Local",
+      "baseUrl": "http://127.0.0.1:4010",
+      "seeded": true,
+      "writesAllowed": true,
+      "enforceLatency": true,
+      "authEnabled": false,
+      "description": {
+        "es": "El mock sin autenticación: npx endpoint-quality mock (o node apps/mock-target/server.mjs --port 4010)",
+        "en": "The mock without authentication: npx endpoint-quality mock (or node apps/mock-target/server.mjs --port 4010)"
+      }
+    },
+    {
+      "id": "local-auth",
+      "name": "Local (auth)",
+      "baseUrl": "http://127.0.0.1:4011",
+      "seeded": true,
+      "writesAllowed": true,
+      "enforceLatency": true,
+      "authEnabled": true,
+      "description": {
+        "es": "El mock exigiendo credenciales, para los casos 401/403: npx endpoint-quality mock (o node apps/mock-target/server.mjs --port 4011 --auth). Credenciales de prueba: Bearer admin-token (principal), Bearer read-token (permisos insuficientes), X-API-Key demo-key (alternativa).",
+        "en": "The mock enforcing credentials, for the 401/403 cases: npx endpoint-quality mock (or node apps/mock-target/server.mjs --port 4011 --auth). Test credentials: Bearer admin-token (primary), Bearer read-token (insufficient), X-API-Key demo-key (alternate)."
+      }
+    }
+  ],
+  "load": {
+    "targets": [
+      { "id": "listProducts:q", "label": "GET /v1/products?q=", "method": "GET", "path": "/v1/products?q={q}&limit=20", "tag": "products" },
+      { "id": "listProducts:sku", "label": "GET /v1/products?sku=", "method": "GET", "path": "/v1/products?sku={sku}", "tag": "products" },
+      {
+        "id": "listStores:geo",
+        "label": "GET /v1/stores?lat&lon&radius_km",
+        "method": "GET",
+        "path": "/v1/stores?lat=40.0000&lon=-100.0000&radius_km=20",
+        "tag": "stores"
+      }
+    ],
+    "mixes": [
+      {
+        "id": "browse",
+        "label": { "es": "Navegación del catálogo", "en": "Catalog browsing" },
+        "hint": {
+          "es": "Listados y fichas de producto y tienda, como un cliente que navega. Mide el camino de lectura habitual.",
+          "en": "Product and store lists and detail pages, like a customer browsing. Measures the usual read path."
+        },
+        "targets": [
+          { "target": "listProducts", "weight": 30 },
+          { "target": "getProduct", "weight": 40 },
+          { "target": "listProductReviews", "weight": 10 },
+          { "target": "listStores", "weight": 10 },
+          { "target": "getStore", "weight": 10 }
+        ]
+      },
+      {
+        "id": "search",
+        "label": { "es": "Búsqueda", "en": "Search" },
+        "hint": {
+          "es": "Texto, SKU exacto y radio geográfico: las consultas que recorren datos en vez de leer por clave.",
+          "en": "Text, exact SKU and geographic radius: the queries that scan data instead of reading by key."
+        },
+        "targets": [
+          { "target": "listProducts:q", "weight": 50 },
+          { "target": "listProducts:sku", "weight": 30 },
+          { "target": "listStores:geo", "weight": 20 }
+        ]
+      },
+      {
+        "id": "health",
+        "label": { "es": "Health", "en": "Health" },
+        "hint": {
+          "es": "Solo GET /health: el piso de latencia del servicio, sin datos de por medio.",
+          "en": "Only GET /health: the service's latency floor, with no data involved."
+        },
+        "targets": [{ "target": "healthCheck", "weight": 1 }]
+      }
+    ],
+    "data": {
+      "product_id": ["1", "2", "3", "4"],
+      "store_id": ["1", "2", "3", "4"],
+      "q": ["lamp", "mug", "oak", "shelf"],
+      "sku": ["SKU-0001", "SKU-0002", "SKU-0003", "SKU-0004"]
+    }
+  }
+}

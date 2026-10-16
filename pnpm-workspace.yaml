@@ -1,0 +1,14 @@
+packages:
+  - "packages/*"
+  - "apps/*"
+
+# Install scripts of dependencies stay off: their platform binaries arrive as optional packages,
+# and the optional native accelerators (msgpackr-extract) have pure-JS fallbacks. Nothing here
+# needs a compiler on macOS, Windows or Linux. Electron's only downloads its prebuilt binary.
+allowBuilds:
+  electron: true
+  electron-winstaller: false
+  esbuild: false
+  sharp: false
+  workerd: false
+  msgpackr-extract: false

@@ -1,0 +1,24 @@
+{
+  "name": "@eq/desktop",
+  "productName": "Endpoint Quality",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Endpoint Quality as a desktop app for macOS, Windows and Linux: the local API and the web app in one window.",
+  "author": "Endpoint Quality",
+  "license": "UNLICENSED",
+  "main": "dist/main.cjs",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "start": "node scripts/build.mjs && electron .",
+    "dist": "node scripts/build.mjs && electron-builder --publish never",
+    "typecheck": "tsc --noEmit -p ."
+  },
+  "devDependencies": {
+    "@types/node": "22.19.19",
+    "electron": "44.7.2",
+    "electron-builder": "26.15.3",
+    "endpoint-quality": "workspace:*",
+    "esbuild": "0.28.2",
+    "typescript": "5.9.3"
+  }
+}
