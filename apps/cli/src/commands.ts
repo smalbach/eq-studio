@@ -4,8 +4,10 @@
  */
 import { readFileSync, writeFileSync } from "node:fs";
 import { spawn } from "node:child_process";
+import { changesByOperation, describeChange, diffSpecs } from "@eq/runner-core";
+import { parseSpec } from "@eq/api/spec";
 import { CliError, client, EXIT, waitForRun, type Client, type Run } from "./client.ts";
-import { bold, dim, green, junitReport, red, textReport } from "./report.ts";
+import { bold, dim, green, junitReport, red, textReport, yellow } from "./report.ts";
 import { startServer, type Server } from "./server.ts";
 import { DATA_DIR, VERSION } from "./runtime.ts";
 
@@ -197,4 +199,40 @@ export async function importProject(path: string | undefined, flags: Flags) {
   const created = await api.post<{ slug: string }>("/v1/projects/import", { file });
   log(`${green("✓")} imported as ${bold(created.slug)}`);
   return EXIT.ok;
+}
+
+/** A contract from a file or an http(s) URL, as JSON or YAML. */
+async function readContract(source: string) {
+  let text: string;
+  if (/^https?:\/\//i.test(source)) {
+    let response: Response;
+    try { response = await fetch(source, { headers: { Accept: "application/json, application/yaml, text/yaml, */*" } }); } catch (error) { throw new CliError(`Cannot read ${source}: ${error instanceof Error ? error.message : String(error)}`, EXIT.error); }
+    if (!response.ok) throw new CliError(`${source} answered ${response.status}`, EXIT.error);
+    text = await response.text();
+  } else {
+    try { text = readFileSync(source, "utf8"); } catch (error) { throw new CliError(`Cannot read ${source}: ${error instanceof Error ? error.message : String(error)}`, EXIT.usage); }
+  }
+  try { return parseSpec(text).document; } catch (error) { throw new CliError(`${source}: ${error instanceof Error ? error.message : String(error)}`, EXIT.usage); }
+}
+
+/**
+ * What changed from one contract to the next, grouped by operation. Exit 1 when a change breaks
+ * clients of the old one, so a pipeline can stop a contract change before it is published.
+ */
+export async function diff(oldSource: string | undefined, newSource: string | undefined, flags: Flags) {
+  if (!oldSource || !newSource) throw new CliError("Give the old and the new contract: eq diff <old> <new> (files or URLs)", EXIT.usage);
+  const result = diffSpecs(await readContract(oldSource), await readContract(newSource));
+  const locale = str(flags, "locale") === "es" ? "es" : "en";
+  if (str(flags, "format") === "json") process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
+  else if (!flags.quiet) {
+    const lines: string[] = [];
+    for (const group of changesByOperation(result.changes)) {
+      lines.push(bold(`${group.method} ${group.path}`) + (group.operationId ? dim(` (${group.operationId})`) : ""));
+      for (const change of group.changes) lines.push(`  ${change.breaking ? red("✖ breaking") : yellow("· change  ")}  ${describeChange(change, locale)}`);
+    }
+    const { breaking, nonBreaking } = result.summary;
+    lines.push(result.changes.length ? `${breaking ? red(`${breaking} breaking`) : green("0 breaking")} · ${nonBreaking} non-breaking` : green("No changes between the two contracts."));
+    process.stdout.write(`${lines.join("\n")}\n`);
+  }
+  return result.summary.breaking ? EXIT.failed : EXIT.ok;
 }

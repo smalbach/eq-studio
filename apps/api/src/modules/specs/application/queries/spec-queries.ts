@@ -3,6 +3,7 @@ import { QueryHandler, type IQueryHandler } from "@nestjs/cqrs";
 import type { ProjectOperation } from "@eq/runner-core";
 import { ProjectRepository } from "../../../projects/infrastructure/project.repository.ts";
 import { SpecVersionRepository } from "../../infrastructure/spec-version.repository.ts";
+import { SpecDiffer, type SpecVersionDiff } from "../spec-differ.ts";
 
 export class ListSpecVersionsQuery { constructor(readonly workspaceId: string, readonly projectId: string) {} }
 
@@ -28,5 +29,17 @@ export class GetOperationsHandler implements IQueryHandler<GetOperationsQuery, P
     const project = await this.projects.require(workspaceId, projectId);
     const id = specVersionId ? (await this.versions.require(project.id, specVersionId)).id : project.activeSpecVersionId;
     return this.versions.operations(id);
+  }
+}
+
+export class GetSpecDiffQuery { constructor(readonly workspaceId: string, readonly projectId: string, readonly from?: string, readonly to?: string) {} }
+
+/** What changed between two versions; by default, from the one before the active version to the active one. */
+@QueryHandler(GetSpecDiffQuery)
+export class GetSpecDiffHandler implements IQueryHandler<GetSpecDiffQuery, SpecVersionDiff> {
+  constructor(@Inject(ProjectRepository) private readonly projects: ProjectRepository, @Inject(SpecDiffer) private readonly differ: SpecDiffer) {}
+
+  async execute({ workspaceId, projectId, from, to }: GetSpecDiffQuery) {
+    return this.differ.forProject(await this.projects.require(workspaceId, projectId), from, to);
   }
 }

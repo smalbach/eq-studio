@@ -95,7 +95,7 @@ lee de `EQ_API_URL`.
 | Código | Significa |
 |---|---|
 | `0` | Todos los casos pasaron |
-| `1` | Algún caso falló (o hubo escrituras bloqueadas, con `--fail-on-blocked`) |
+| `1` | Algún caso falló (o hubo escrituras bloqueadas, con `--fail-on-blocked`); en `eq diff`, algún cambio rompe |
 | `2` | El comando estaba mal: un flag, un proyecto o un entorno que no existe |
 | `3` | No se pudo correr: el API no responde, o la corrida terminó en error |
 
@@ -164,6 +164,35 @@ Como compuerta en CI, una prueba corta a la tasa esperada con un p95 propio:
 ```bash
 eq load --file store-api.eq.json --env staging --base-url "$STAGING_URL" \
   --type load --rps 20 --duration 60 --p95 500 --junit eq-load.xml
+```
+
+## Cambios del contrato
+
+`eq diff` compara dos contratos OpenAPI 3 (archivos o URLs http(s), JSON o YAML) y lista qué
+cambió por operación, marcando lo que rompe a los clientes del anterior. Sale con `1` si hay algún
+cambio que rompe: un paso de CI que frena un cambio de contrato antes de publicarlo.
+
+```bash
+eq diff https://api.example.com/openapi.json openapi.yaml
+```
+
+```text
+GET /v1/products (listProducts)
+  ✖ breaking  response 200: field $.data[].price removed
+POST /v1/products (createProduct)
+  ✖ breaking  request: required field $.currency added
+  · change    query.dry_run: optional parameter added
+2 breaking · 1 non-breaking
+```
+
+`--json` imprime los cambios y sus conteos como JSON; `--locale es` describe los cambios en
+español. Qué cuenta como cambio que rompe está en [Conceptos](doc:conceptos).
+
+En GitHub Actions, contra el contrato de la rama principal (`actions/checkout` con `fetch-depth: 0`):
+
+```yaml
+- run: git show origin/main:openapi.yaml > /tmp/openapi-main.yaml
+- run: npx endpoint-quality diff /tmp/openapi-main.yaml openapi.yaml
 ```
 
 ## Proyectos como archivos

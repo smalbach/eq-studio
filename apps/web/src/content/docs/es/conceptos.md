@@ -12,6 +12,30 @@ El documento **OpenAPI 3** de la API. Al importarlo se guarda una **versión**: 
 
 De cada operación del contrato se toma el método, la ruta, el tag, los **status declarados** y los **parámetros**. Un status declarado habilita sus casos: si tu API responde 409 pero el contrato no lo declara, nadie lo prueba.
 
+### Cambios entre versiones
+
+Entre dos versiones del contrato se puede ver qué cambió, agrupado por operación (en el menú del
+proyecto → **Versiones del contrato**, `GET /v1/projects/:project/specs/diff?from=&to=` o
+`eq diff`). Cada cambio se marca como **rompe** o **compatible** con una regla: rompe si una
+petición que antes era válida deja de aceptarse, o si una respuesta deja de dar algo de lo que un
+cliente dependía.
+
+| Rompe | Compatible |
+|---|---|
+| Operación eliminada | Operación nueva |
+| Parámetro obligatorio nuevo, o uno opcional que pasa a obligatorio | Parámetro opcional nuevo, o eliminado |
+| Campo obligatorio nuevo en el cuerpo de la petición | Campo opcional nuevo, o eliminado, en la petición |
+| Tipo más estrecho en un parámetro o en la petición (`number` → `integer`) | Tipo más amplio (`integer` → `number`, admitir `null`) |
+| Valor de enum eliminado de un parámetro o de la petición | Valor de enum nuevo en un parámetro o en la petición |
+| Status eliminado de las respuestas | Status nuevo |
+| Campo eliminado, de tipo cambiado o que deja de ser obligatorio en la respuesta | Campo nuevo en la respuesta |
+| Valor de enum nuevo en la respuesta (un cliente que la valida no lo conoce) | Valor de enum eliminado de la respuesta |
+| Exigir credencial donde no se exigía, o dejar de aceptar un esquema de seguridad | Dejar de exigirla, o aceptar un esquema más |
+
+Los `$ref` se resuelven y los `allOf` se fusionan: mover campos a un componente compartido no es un
+cambio. Al importar una versión nueva, la app avisa si trae cambios que rompen respecto a la que
+estaba activa.
+
 ## Entorno
 
 Dónde corre la API: una **URL base** y lo que se permite hacer allí.

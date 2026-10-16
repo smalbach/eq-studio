@@ -6,7 +6,7 @@ import { Requires } from "../../../shared/rbac.ts";
 import { Workspace } from "../../../shared/workspace.ts";
 import { specSource } from "../../shared/inputs.ts";
 import { ActivateSpecVersionCommand, ImportSpecVersionCommand } from "../application/commands/spec-commands.ts";
-import { GetOperationsQuery, ListSpecVersionsQuery } from "../application/queries/spec-queries.ts";
+import { GetOperationsQuery, GetSpecDiffQuery, ListSpecVersionsQuery } from "../application/queries/spec-queries.ts";
 
 const importVersion = z.object({ source: specSource, activate: z.boolean().optional() });
 
@@ -17,6 +17,11 @@ export class SpecsController {
   @Get("spec-versions")
   list(@Workspace() workspaceId: string, @Param("project") project: string) {
     return this.queries.execute(new ListSpecVersionsQuery(workspaceId, project));
+  }
+
+  @Get(["specs/diff", "spec-versions/diff"])
+  diff(@Workspace() workspaceId: string, @Param("project") project: string, @Query("from") from?: string, @Query("to") to?: string) {
+    return this.queries.execute(new GetSpecDiffQuery(workspaceId, project, from || undefined, to || undefined));
   }
 
   @Requires("editor")

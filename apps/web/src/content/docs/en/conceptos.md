@@ -12,6 +12,29 @@ The API's **OpenAPI 3** document. Importing it stores a **version**: an immutabl
 
 From each operation of the contract the method, path, tag, **declared statuses** and **parameters** are taken. A declared status enables its cases: if your API answers 409 but the contract does not declare it, nobody tests it.
 
+### Changes between versions
+
+Between two contract versions you can see what changed, grouped by operation (in the project
+menu → **Contract versions**, `GET /v1/projects/:project/specs/diff?from=&to=` or `eq diff`). Each
+change is marked **breaking** or **compatible** by one rule: it breaks when a request that used to
+be valid is no longer accepted, or when a response no longer gives something a client relied on.
+
+| Breaking | Compatible |
+|---|---|
+| Operation removed | Operation added |
+| New required parameter, or an optional one that becomes required | New optional parameter, or one removed |
+| New required field in the request body | New optional field, or one removed, in the request |
+| Narrower type in a parameter or the request (`number` → `integer`) | Wider type (`integer` → `number`, allowing `null`) |
+| Enum value removed from a parameter or the request | Enum value added to a parameter or the request |
+| Response status removed | Response status added |
+| Response field removed, retyped or no longer required | Response field added |
+| Enum value added to a response (a client that validates it does not know it) | Enum value removed from a response |
+| Requiring a credential where none was needed, or no longer accepting a security scheme | No longer requiring one, or accepting another scheme |
+
+`$ref`s are resolved and `allOf`s merged: moving fields into a shared component is not a change.
+When a new version is imported, the app warns if it brings breaking changes against the one that
+was active.
+
 ## Environment
 
 Where the API runs: a **base URL** and what may be done there.

@@ -16,6 +16,7 @@ In local mode the API listens on `http://127.0.0.1:4400`, on the loopback only a
 | `GET /v1/examples` · `GET /v1/examples/:id` · `POST /v1/examples/:id/import` | The bundled example projects; import one as a project. |
 | `GET/POST /v1/projects/:project/spec-versions` | Contract versions; import a new one (`{ source: { url } \| { document }, activate? }`). |
 | `POST /v1/projects/:project/spec-versions/:version/activate` | Goes back to another contract version. |
+| `GET /v1/projects/:project/specs/diff?from=&to=` | The changes between two versions, each marked `breaking` or not; by default, from the previous one to the active one. Importing a new version also returns `diff.summary` against the one that was active. |
 | `GET /v1/projects/:project/operations` | Operations of the active version. |
 | `GET /v1/projects/:project/config` | The configuration and its `rev`. |
 | `PUT /v1/projects/:project/config/:section` | `{ value, expectedRev? }`: saves one section, validated against the contract. |
