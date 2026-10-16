@@ -75,21 +75,19 @@ dirección es privada y el despliegue vive en una red privada, activa `EQ_ALLOW_
 
 ## Notificaciones por email (SMTP)
 
-Las notificaciones por webhook y Slack no necesitan nada en el servidor. El email sí: sin `EQ_SMTP_HOST` el panel no lo ofrece.
+Las notificaciones por webhook y Slack no necesitan nada en el servidor. El email sí: sin SMTP el panel no lo ofrece. Es el mismo servidor que envía los enlaces para restablecer la contraseña (ver [Correo y contraseñas olvidadas](#correo-y-contrasenas-olvidadas)): se configura una sola vez.
 
 | Variable | Por defecto | Qué hace |
 | --- | --- | --- |
-| `EQ_SMTP_HOST` | — | El servidor SMTP. Activa las notificaciones por email. |
-| `EQ_SMTP_PORT` | `587` | Puerto: `587` con STARTTLS, `465` con TLS desde el inicio. |
-| `EQ_SMTP_SECURE` | `true` en el puerto 465 | `true`: TLS desde el primer byte. `false`: en claro, y se sube a STARTTLS si el servidor lo ofrece. |
-| `EQ_SMTP_USER` · `EQ_SMTP_PASSWORD` | — | Credenciales (AUTH PLAIN). Solo se envían por una conexión cifrada. |
-| `EQ_SMTP_FROM` | `Endpoint Quality <noreply@<host>>` | El remitente. |
-| `EQ_PUBLIC_URL` | — | La dirección pública del despliegue (`https://eq.example.com`), para que cada notificación enlace a su corrida. |
+| `EQ_SMTP_URL` | — | El servidor, en una URL: `smtp://usuario:clave@host:587` (STARTTLS) o `smtps://usuario:clave@host:465` (TLS desde el inicio). Codifica `@` como `%40`. |
+| `EQ_MAIL_FROM` | `Endpoint Quality <no-reply@localhost>` | El remitente de todos los correos. |
+| `EQ_PUBLIC_URL` | — | La dirección pública del despliegue (`https://eq.example.com`), para que cada correo enlace a su corrida. Obligatoria con SMTP en la nube. |
+
+Si tu proveedor entrega los datos por separado, en lugar de `EQ_SMTP_URL` puedes usar `EQ_SMTP_HOST`, `EQ_SMTP_PORT` (`587`), `EQ_SMTP_SECURE` (`true` en el 465), `EQ_SMTP_USER`, `EQ_SMTP_PASSWORD` y `EQ_SMTP_FROM`: el API arma la URL con ellos. Si están las dos formas, gana `EQ_SMTP_URL`. Con usuario y `smtp://`, el servidor tiene que ofrecer STARTTLS: la contraseña nunca viaja en claro.
 
 ```bash
-EQ_SMTP_HOST=smtp.example.com EQ_SMTP_PORT=587 \
-EQ_SMTP_USER=eq@example.com EQ_SMTP_PASSWORD=… \
-EQ_SMTP_FROM="Endpoint Quality <eq@example.com>" \
+EQ_SMTP_URL=smtp://eq%40example.com:clave-de-app@smtp.example.com:587
+EQ_MAIL_FROM="Endpoint Quality <eq@example.com>"
 EQ_PUBLIC_URL=https://eq.example.com
 ```
 
@@ -241,7 +239,7 @@ Todas las variables que lee un despliegue en la nube (las solo locales están en
 | `EQ_ALLOW_PRIVATE_TARGETS` | `false` | `true` deja a las corridas llegar a direcciones privadas. |
 | `EQ_CORS_ORIGINS` | — | Orígenes permitidos si la web se sirve desde otro dominio. |
 | `EQ_PUBLIC_URL` | — | La dirección que abre la gente. Obligatoria con SMTP o SSO. |
-| `EQ_SMTP_URL` · `EQ_MAIL_FROM` | — · `Endpoint Quality <no-reply@localhost>` | Correo (enlaces para restablecer la contraseña). |
+| `EQ_SMTP_URL` · `EQ_MAIL_FROM` | — · `Endpoint Quality <no-reply@localhost>` | Correo: enlaces para restablecer la contraseña y notificaciones (o `EQ_SMTP_HOST` y sus partes). |
 | `EQ_METRICS` · `EQ_METRICS_TOKEN` | `false` · — | `GET /metrics` y su token bearer. |
 | `EQ_OIDC_ISSUER` · `EQ_OIDC_CLIENT_ID` · `EQ_OIDC_CLIENT_SECRET` | — | Inicio de sesión único. |
 | `EQ_OIDC_ALLOWED_DOMAINS` · `EQ_OIDC_NAME` · `EQ_OIDC_SCOPES` | — · `SSO` · `openid email profile` | Dominios de correo permitidos, nombre del botón, scopes. |

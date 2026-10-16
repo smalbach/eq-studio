@@ -32,7 +32,7 @@ services:
       EQ_RUN_CONCURRENCY: ${EQ_RUN_CONCURRENCY:-2}
       # The address people open (https://eq.example.com): base of emailed links and of the SSO redirect.
       EQ_PUBLIC_URL: ${EQ_PUBLIC_URL:-}
-      # Email. Without EQ_SMTP_URL nothing is sent (and "Forgot password" cannot reach anyone).
+      # Email, for password resets and notifications. Without EQ_SMTP_URL nothing is sent.
       EQ_SMTP_URL: ${EQ_SMTP_URL:-}
       EQ_MAIL_FROM: ${EQ_MAIL_FROM:-Endpoint Quality <no-reply@localhost>}
       # Prometheus: GET /metrics, off unless "true"; with a token it needs "Authorization: Bearer <token>".

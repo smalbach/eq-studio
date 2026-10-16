@@ -75,21 +75,19 @@ and the deployment lives in a private network, set `EQ_ALLOW_PRIVATE_TARGETS=tru
 
 ## Email notifications (SMTP)
 
-Webhook and Slack notifications need nothing on the server. Email does: without `EQ_SMTP_HOST` the panel does not offer it.
+Webhook and Slack notifications need nothing on the server. Email does: without SMTP the panel does not offer it. It is the same server that sends the password reset links (see [Email and forgotten passwords](#email-and-forgotten-passwords)): it is configured once.
 
 | Variable | Default | What it does |
 | --- | --- | --- |
-| `EQ_SMTP_HOST` | — | The SMTP server. Turns email notifications on. |
-| `EQ_SMTP_PORT` | `587` | Port: `587` with STARTTLS, `465` with TLS from the start. |
-| `EQ_SMTP_SECURE` | `true` on port 465 | `true`: TLS from the first byte. `false`: plain, upgraded with STARTTLS if the server offers it. |
-| `EQ_SMTP_USER` · `EQ_SMTP_PASSWORD` | — | Credentials (AUTH PLAIN). They are only ever sent over an encrypted connection. |
-| `EQ_SMTP_FROM` | `Endpoint Quality <noreply@<host>>` | The sender. |
-| `EQ_PUBLIC_URL` | — | The deployment's public address (`https://eq.example.com`), so every notification links to its run. |
+| `EQ_SMTP_URL` | — | The server, as a URL: `smtp://user:password@host:587` (STARTTLS) or `smtps://user:password@host:465` (TLS from the start). Encode `@` as `%40`. |
+| `EQ_MAIL_FROM` | `Endpoint Quality <no-reply@localhost>` | The sender of every email. |
+| `EQ_PUBLIC_URL` | — | The deployment's public address (`https://eq.example.com`), so every email links to its run. Required with SMTP in the cloud. |
+
+If your provider hands out the parts separately, instead of `EQ_SMTP_URL` you can use `EQ_SMTP_HOST`, `EQ_SMTP_PORT` (`587`), `EQ_SMTP_SECURE` (`true` on 465), `EQ_SMTP_USER`, `EQ_SMTP_PASSWORD` and `EQ_SMTP_FROM`: the API builds the URL from them. With both forms set, `EQ_SMTP_URL` wins. With a user over `smtp://`, the server must offer STARTTLS: the password never travels in clear.
 
 ```bash
-EQ_SMTP_HOST=smtp.example.com EQ_SMTP_PORT=587 \
-EQ_SMTP_USER=eq@example.com EQ_SMTP_PASSWORD=… \
-EQ_SMTP_FROM="Endpoint Quality <eq@example.com>" \
+EQ_SMTP_URL=smtp://eq%40example.com:app-password@smtp.example.com:587
+EQ_MAIL_FROM="Endpoint Quality <eq@example.com>"
 EQ_PUBLIC_URL=https://eq.example.com
 ```
 
@@ -238,7 +236,7 @@ Every variable a cloud deployment reads (the local-only ones are in the [API ref
 | `EQ_ALLOW_PRIVATE_TARGETS` | `false` | `true` lets runs reach private addresses. |
 | `EQ_CORS_ORIGINS` | — | Allowed origins if the web app is served elsewhere. |
 | `EQ_PUBLIC_URL` | — | The address people open. Required with SMTP or SSO. |
-| `EQ_SMTP_URL` · `EQ_MAIL_FROM` | — · `Endpoint Quality <no-reply@localhost>` | Email (password reset links). |
+| `EQ_SMTP_URL` · `EQ_MAIL_FROM` | — · `Endpoint Quality <no-reply@localhost>` | Email: password reset links and notifications (or `EQ_SMTP_HOST` and its parts). |
 | `EQ_METRICS` · `EQ_METRICS_TOKEN` | `false` · — | `GET /metrics` and its bearer token. |
 | `EQ_OIDC_ISSUER` · `EQ_OIDC_CLIENT_ID` · `EQ_OIDC_CLIENT_SECRET` | — | Single sign-on. |
 | `EQ_OIDC_ALLOWED_DOMAINS` · `EQ_OIDC_NAME` · `EQ_OIDC_SCOPES` | — · `SSO` · `openid email profile` | Allowed email domains, button name, scopes. |

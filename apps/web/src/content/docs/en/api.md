@@ -153,10 +153,10 @@ The API is configured with environment variables. With `pnpm start` (or `pnpm ru
 | `EQ_SYNC_INTERVAL_SECONDS` | `300` locally | How often an installation linked to the cloud syncs on its own (`0`: only on demand). |
 | `EQ_SCHEDULER_TICK_SECONDS` | `30` | How often the API looks for due schedules (`0`: schedules do not fire in this process). |
 | `EQ_PUBLIC_URL` | `http://localhost:<port>` locally | The web app's public address, for the links in notifications. |
-| `EQ_SMTP_HOST` · `EQ_SMTP_PORT` · `EQ_SMTP_SECURE` · `EQ_SMTP_USER` · `EQ_SMTP_PASSWORD` · `EQ_SMTP_FROM` | — · `587` · `true` on 465 | SMTP for email notifications; without `EQ_SMTP_HOST` email is not offered. See [Cloud deployment](doc:deploy). |
+| `EQ_SMTP_HOST` · `EQ_SMTP_PORT` · `EQ_SMTP_SECURE` · `EQ_SMTP_USER` · `EQ_SMTP_PASSWORD` · `EQ_SMTP_FROM` | — · `587` · `true` on 465 | The same SMTP in parts, instead of `EQ_SMTP_URL` (which wins when both are set). See [Cloud deployment](doc:deploy). |
 | `EQ_LOG` | — | `debug` for more detail, `silent` for nothing. By default, errors and warnings. |
 | `EQ_PUBLIC_URL` | — | The address people open (`https://eq.example.com`): base of the links in emails and of the SSO redirect. Required with `EQ_SMTP_URL` or `EQ_OIDC_ISSUER`. |
-| `EQ_SMTP_URL` | — | SMTP server for emails (`smtp://user:pass@host:587`, `smtps://…:465`). Without it, nothing is sent. |
+| `EQ_SMTP_URL` | — | SMTP server for every email: password reset links and notifications (`smtp://user:pass@host:587`, `smtps://…:465`). Without SMTP nothing is sent and email is not offered for notifications. |
 | `EQ_MAIL_FROM` | `Endpoint Quality <no-reply@localhost>` | Sender of the emails. |
 | `EQ_METRICS` | `false` | `true` serves `GET /metrics` for Prometheus. |
 | `EQ_METRICS_TOKEN` | — | If set, `/metrics` needs `Authorization: Bearer <token>`. |

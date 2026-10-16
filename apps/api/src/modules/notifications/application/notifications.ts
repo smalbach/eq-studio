@@ -5,6 +5,7 @@ import type { AppConfig } from "../../../config.ts";
 import type { EnvironmentRow, NotificationKind, NotificationTargetRow, NotificationTrigger, ProjectRow, RunRow } from "../../../database/entities.ts";
 import { Invalid } from "../../../shared/errors.ts";
 import { isoNow, uuidv7 } from "../../../shared/ids.ts";
+import { Mailer } from "../../../shared/mailer.ts";
 import { SecretBox } from "../../../shared/secret-box.ts";
 import { APP_CONFIG, HTTP_FETCH, SECRET_BOX } from "../../../shared/tokens.ts";
 import { EnvironmentRepository } from "../../environments/infrastructure/environment.repository.ts";
@@ -12,7 +13,6 @@ import { ProjectRepository } from "../../projects/infrastructure/project.reposit
 import { RunFinished } from "../../shared/events.ts";
 import { emailMessage, shouldNotify, signature, slackMessage, urlHint, verdictOf, type RunPayload } from "../domain/notification.ts";
 import { NotificationRepository } from "../infrastructure/notification.repository.ts";
-import { sendMail } from "../infrastructure/smtp.ts";
 
 export type TargetInput = { name: string; kind: NotificationKind; notifyOn: NotificationTrigger; enabled: boolean; url?: string; signingSecret?: string | null; recipients?: string[] };
 export type TargetChanges = Partial<Omit<TargetInput, "kind">>;
@@ -34,9 +34,10 @@ export class NotificationService {
     @Inject(SECRET_BOX) private readonly box: SecretBox,
     @Inject(HTTP_FETCH) private readonly fetchImpl: typeof fetch,
     @Inject(APP_CONFIG) private readonly config: AppConfig,
+    @Inject(Mailer) private readonly mailer: Mailer,
   ) {}
 
-  get emailAvailable() { return Boolean(this.config.smtp); }
+  get emailAvailable() { return this.mailer.configured; }
 
   async list(workspaceId: string, projectId: string) {
     const project = await this.projects.require(workspaceId, projectId);
@@ -73,7 +74,7 @@ export class NotificationService {
     if (input.notifyOn !== undefined) row.notifyOn = input.notifyOn;
     if (input.enabled !== undefined) row.enabled = input.enabled;
     if (row.kind === "email") {
-      if (!this.emailAvailable) throw new Invalid("Email needs an SMTP server: set EQ_SMTP_HOST (and EQ_SMTP_FROM, EQ_SMTP_USER, EQ_SMTP_PASSWORD) where the API runs");
+      if (!this.emailAvailable) throw new Invalid("Email needs an SMTP server: set EQ_SMTP_URL (or EQ_SMTP_HOST, EQ_SMTP_USER, EQ_SMTP_PASSWORD) and EQ_MAIL_FROM where the API runs");
       if (input.recipients !== undefined) row.recipients = input.recipients;
       if (!row.recipients?.length) throw new Invalid("An email target needs at least one recipient");
       return;
@@ -112,8 +113,8 @@ export class NotificationService {
 
   private async send(row: NotificationTargetRow, payload: RunPayload, locale: "es" | "en"): Promise<Delivery> {
     if (row.kind === "email") {
-      if (!this.config.smtp) return { ok: false, status: null, error: "SMTP is not configured (EQ_SMTP_HOST)" };
-      await sendMail(this.config.smtp, { to: row.recipients ?? [], ...emailMessage(payload, locale) });
+      if (!this.mailer.configured) return { ok: false, status: null, error: "SMTP is not configured (EQ_SMTP_URL or EQ_SMTP_HOST)" };
+      await this.mailer.deliver({ to: row.recipients ?? [], ...emailMessage(payload, locale) });
       return { ok: true, status: null, error: null };
     }
     if (!row.url) return { ok: false, status: null, error: "The target has no URL" };

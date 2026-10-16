@@ -33,15 +33,11 @@ export type NetworkConfig = {
    * proxy in front: e.g. `1` for one load balancer. */
   trustProxy?: string;
 };
-/** Outbound email for notifications. Absent: the email target is not offered. */
-export type SmtpConfig = { host: string; port: number; secure: boolean; user?: string; password?: string; from: string };
 export type AppConfig = { mode: "local" | "cloud"; host: string; port: number; database: DatabaseConfig; secrets: SecretKeySource; queue: QueueConfig; examplesDir?: string; webDir?: string; auth?: AuthConfig; network?: NetworkConfig;
   /** Local mode, once linked to a cloud workspace: seconds between automatic syncs (0: only on demand). */
   sync?: { intervalSeconds: number };
   /** Seconds between the scheduler's checks for due schedules (0: schedules never fire here). Default 30. */
   scheduler?: { tickSeconds: number };
-  /** Outbound email for notifications (EQ_SMTP_HOST…). */
-  smtp?: SmtpConfig;
   /** The address people open, e.g. `https://eq.example.com`: the base of links sent by email, in
    * notifications and of the SSO redirect. Never taken from a request's Host header, which a client controls. */
   publicUrl?: string;
@@ -51,7 +47,7 @@ export type AppConfig = { mode: "local" | "cloud"; host: string; port: number; d
   metrics?: MetricsConfig;
   oidc?: OidcConfig };
 
-/** SMTP, for every email the API sends. Without `url` nothing is sent. */
+/** SMTP, for every email the API sends (password resets, notifications). Without `url` nothing is sent. */
 export type MailConfig = { url: string | null; from: string };
 export type MetricsConfig = { enabled: boolean; token: string | null };
 /** Single sign-on with any OpenID Connect provider (authorization code + PKCE). */
@@ -90,7 +86,7 @@ export function readConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     trustProxy: env.EQ_TRUST_PROXY,
   };
   const publicUrl = env.EQ_PUBLIC_URL?.replace(/\/+$/, "") ?? (mode === "local" ? `http://localhost:${port}` : undefined);
-  const mail: MailConfig = { url: env.EQ_SMTP_URL || null, from: env.EQ_MAIL_FROM || "Endpoint Quality <no-reply@localhost>" };
+  const mail = mailConfig(env);
   const metrics: MetricsConfig = { enabled: env.EQ_METRICS === "true", token: env.EQ_METRICS_TOKEN || null };
   let oidc: OidcConfig | undefined;
   if (env.EQ_OIDC_ISSUER) {
@@ -98,11 +94,26 @@ export function readConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     if (!publicUrl) throw new Error("EQ_OIDC_ISSUER needs EQ_PUBLIC_URL: the redirect URI is built from it");
     oidc = { issuer: env.EQ_OIDC_ISSUER, clientId: env.EQ_OIDC_CLIENT_ID, clientSecret: env.EQ_OIDC_CLIENT_SECRET || null, allowedDomains: (env.EQ_OIDC_ALLOWED_DOMAINS ?? "").split(",").map((domain) => domain.trim().toLowerCase()).filter(Boolean), name: env.EQ_OIDC_NAME || "SSO", scopes: env.EQ_OIDC_SCOPES || "openid email profile" };
   }
-  if (mode === "cloud" && mail.url && !publicUrl) throw new Error("EQ_SMTP_URL needs EQ_PUBLIC_URL: the links in the emails are built from it");
+  if (mode === "cloud" && mail.url && !publicUrl) throw new Error("SMTP (EQ_SMTP_URL or EQ_SMTP_HOST) needs EQ_PUBLIC_URL: the links in the emails are built from it");
   const sync = { intervalSeconds: mode === "local" ? Math.max(0, Number(env.EQ_SYNC_INTERVAL_SECONDS ?? 300) || 0) : 0 };
   const scheduler = { tickSeconds: Math.max(0, Number(env.EQ_SCHEDULER_TICK_SECONDS ?? 30) || 0) };
-  const smtpPort = Number(env.EQ_SMTP_PORT ?? 587);
-  const smtp: SmtpConfig | undefined = env.EQ_SMTP_HOST ? { host: env.EQ_SMTP_HOST, port: smtpPort, secure: env.EQ_SMTP_SECURE ? env.EQ_SMTP_SECURE === "true" : smtpPort === 465, user: env.EQ_SMTP_USER || undefined, password: env.EQ_SMTP_PASSWORD || undefined, from: env.EQ_SMTP_FROM ?? `Endpoint Quality <noreply@${env.EQ_SMTP_HOST}>` } : undefined;
   const host = env.EQ_HOST ?? (mode === "local" ? "127.0.0.1" : "0.0.0.0");
-  return { sync, scheduler, smtp, mode, port, host, database, secrets, queue, examplesDir: env.EQ_EXAMPLES_DIR ?? DEFAULT_EXAMPLES_DIR, webDir: env.EQ_WEB_DIR ?? DEFAULT_WEB_DIR, auth, network, publicUrl, devCloud: mode === "cloud" && env.EQ_CLOUD_SQLITE === "true", mail, metrics, oidc };
+  return { sync, scheduler, mode, port, host, database, secrets, queue, examplesDir: env.EQ_EXAMPLES_DIR ?? DEFAULT_EXAMPLES_DIR, webDir: env.EQ_WEB_DIR ?? DEFAULT_WEB_DIR, auth, network, publicUrl, devCloud: mode === "cloud" && env.EQ_CLOUD_SQLITE === "true", mail, metrics, oidc };
+}
+
+/**
+ * One SMTP server for everything. `EQ_SMTP_URL` (`smtp://user:pass@host:587`, `smtps://…:465`)
+ * wins; otherwise it is assembled from `EQ_SMTP_HOST`, `EQ_SMTP_PORT` (587), `EQ_SMTP_SECURE`
+ * (true on 465), `EQ_SMTP_USER` and `EQ_SMTP_PASSWORD`, for providers that hand out the parts.
+ * The sender is `EQ_MAIL_FROM` (or `EQ_SMTP_FROM`).
+ */
+export function mailConfig(env: NodeJS.ProcessEnv): MailConfig {
+  const from = env.EQ_MAIL_FROM || env.EQ_SMTP_FROM || (env.EQ_SMTP_HOST ? `Endpoint Quality <noreply@${env.EQ_SMTP_HOST}>` : "Endpoint Quality <no-reply@localhost>");
+  if (env.EQ_SMTP_URL) return { url: env.EQ_SMTP_URL, from };
+  if (!env.EQ_SMTP_HOST) return { url: null, from };
+  const port = Number(env.EQ_SMTP_PORT ?? 587);
+  const secure = env.EQ_SMTP_SECURE ? env.EQ_SMTP_SECURE === "true" : port === 465;
+  const user = env.EQ_SMTP_USER ? `${encodeURIComponent(env.EQ_SMTP_USER)}${env.EQ_SMTP_PASSWORD ? `:${encodeURIComponent(env.EQ_SMTP_PASSWORD)}` : ""}@` : "";
+  const host = env.EQ_SMTP_HOST.includes(":") ? `[${env.EQ_SMTP_HOST}]` : env.EQ_SMTP_HOST;
+  return { url: `${secure ? "smtps" : "smtp"}://${user}${host}:${port}`, from };
 }

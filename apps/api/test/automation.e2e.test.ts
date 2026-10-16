@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createServer, type IncomingHttpHeaders } from "node:http";
-import { createServer as createTcpServer } from "node:net";
+import { createServer as createTcpServer, type Socket } from "node:net";
 import { readFileSync } from "node:fs";
 import { after, before, describe, test } from "node:test";
 import { CommandBus } from "@nestjs/cqrs";
@@ -15,7 +15,8 @@ import { Scheduler } from "../src/modules/schedules/application/scheduler.ts";
 import { ScheduleRepository } from "../src/modules/schedules/infrastructure/schedule.repository.ts";
 import { emailMessage, shouldNotify, signature, slackMessage, verdictOf, type RunPayload } from "../src/modules/notifications/domain/notification.ts";
 import { NotificationService, RunFinishedNotifier } from "../src/modules/notifications/application/notifications.ts";
-import { sendMail } from "../src/modules/notifications/infrastructure/smtp.ts";
+import { mailConfig } from "../src/config.ts";
+import { Mailer } from "../src/shared/mailer.ts";
 import { databases, start, waitFor, type Harness } from "./helpers.ts";
 
 const example = JSON.parse(readFileSync(new URL("../../../examples/mock-store/mock-store.eq.json", import.meta.url), "utf8"));
@@ -71,7 +72,18 @@ describe("notification rules", () => {
   });
 });
 
+/** The shared Mailer against a server at `url`, as the notifications use it. */
+const mailerFor = (url: string, from = "EQ <eq@example.com>") => new Mailer({ mail: { url, from } } as AppConfig);
+
 describe("smtp", () => {
+  test("one configuration: EQ_SMTP_URL, or assembled from EQ_SMTP_HOST and its parts", () => {
+    assert.deepEqual(mailConfig({}), { url: null, from: "Endpoint Quality <no-reply@localhost>" });
+    assert.deepEqual(mailConfig({ EQ_SMTP_URL: "smtps://u:p@mail.test:465", EQ_SMTP_HOST: "ignored", EQ_MAIL_FROM: "EQ <eq@example.com>" }), { url: "smtps://u:p@mail.test:465", from: "EQ <eq@example.com>" });
+    assert.deepEqual(mailConfig({ EQ_SMTP_HOST: "mail.test", EQ_SMTP_USER: "me@x.com", EQ_SMTP_PASSWORD: "p@ss:w" }), { url: "smtp://me%40x.com:p%40ss%3Aw@mail.test:587", from: "Endpoint Quality <noreply@mail.test>" });
+    assert.equal(mailConfig({ EQ_SMTP_HOST: "mail.test", EQ_SMTP_PORT: "465", EQ_SMTP_FROM: "a@b.c" }).url, "smtps://mail.test:465");
+    assert.equal(mailConfig({ EQ_SMTP_HOST: "mail.test", EQ_SMTP_PORT: "2525", EQ_SMTP_SECURE: "true" }).url, "smtps://mail.test:2525");
+  });
+
   test("sends one message to every recipient, the subject encoded", async () => {
     const received: string[] = [];
     let data = "";
@@ -102,19 +114,22 @@ describe("smtp", () => {
     });
     await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
     const port = (server.address() as { port: number }).port;
-    await sendMail({ host: "127.0.0.1", port, secure: false, from: "EQ <eq@example.com>" }, { to: ["a@example.com", "b@example.com"], subject: "Tienda · Producción: falló", text: "línea 1\nlínea 2" });
+    await mailerFor(`smtp://127.0.0.1:${port}`).deliver({ to: ["a@example.com", "b@example.com"], subject: "Tienda · Producción: falló", text: "línea 1\nlínea 2" });
     server.close();
-    assert.deepEqual(received.filter((line) => /^(MAIL|RCPT)/.test(line)), ["MAIL FROM:<eq@example.com>", "RCPT TO:<a@example.com>", "RCPT TO:<b@example.com>"]);
-    assert.match(data, /^Subject: =\?UTF-8\?B\?/m);
-    const body = data.split("\r\n\r\n")[1];
-    assert.equal(Buffer.from(body.replace(/\r\n/g, ""), "base64").toString("utf8"), "línea 1\r\nlínea 2");
+    assert.deepEqual(received.filter((line) => /^(MAIL|RCPT)/.test(line)).map((line) => line.replace(/ BODY=8BITMIME$/, "")), ["MAIL FROM:<eq@example.com>", "RCPT TO:<a@example.com>", "RCPT TO:<b@example.com>"]);
+    assert.match(data, /^Subject: =\?UTF-8\?[BQ]\?/im);
+    assert.match(data, /^Content-Type: text\/plain; charset=utf-8/im);
   });
 
   test("never sends a password over a connection without TLS", async () => {
-    const server = createTcpServer((socket) => { socket.write("220 fake\r\n"); socket.on("data", () => socket.write("250 fake\r\n")); });
+    const sockets: Socket[] = [];
+    const seen: string[] = [];
+    const server = createTcpServer((socket) => { sockets.push(socket); socket.write("220 fake\r\n"); socket.on("data", (chunk) => { seen.push(chunk.toString("latin1")); socket.write("250 fake\r\n"); }); });
     await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
     const port = (server.address() as { port: number }).port;
-    await assert.rejects(sendMail({ host: "127.0.0.1", port, secure: false, user: "u", password: "p", from: "eq@example.com" }, { to: ["a@example.com"], subject: "s", text: "t" }), /not sent in clear/);
+    await assert.rejects(mailerFor(`smtp://u:p@127.0.0.1:${port}`).deliver({ to: ["a@example.com"], subject: "s", text: "t" }));
+    for (const socket of sockets) socket.destroy();
+    assert.equal(seen.some((chunk) => chunk.startsWith("AUTH")), false, "no AUTH over plain text");
     server.close();
   });
 });
@@ -290,7 +305,7 @@ for (const database of databases()) {
       assert.equal(listed.body.emailAvailable, false);
       const refused = await h.request("POST", "/v1/projects/mock-store/notifications", { name: "Team", kind: "email", recipients: ["team@example.com"] });
       assert.equal(refused.status, 422);
-      assert.match(refused.body.detail, /EQ_SMTP_HOST/);
+      assert.match(refused.body.detail, /EQ_SMTP_URL/);
     });
   });
 }

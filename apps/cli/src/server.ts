@@ -5,7 +5,7 @@
 import { randomBytes } from "node:crypto";
 import { join } from "node:path";
 import { createApp } from "@eq/api/app";
-import { readConfig, type AppConfig } from "@eq/api/config";
+import { mailConfig, readConfig, type AppConfig } from "@eq/api/config";
 import { DATA_DIR, resources } from "./runtime.ts";
 
 export type Server = { url: string; close(): Promise<void> };
@@ -26,7 +26,7 @@ export async function startServer(options: { port: number; host: string; persist
     sync: { intervalSeconds: options.autoSync ? Math.max(0, Number(process.env.EQ_SYNC_INTERVAL_SECONDS ?? 300) || 0) : 0 },
     // Schedules fire from the long-running server only, never from one started for a single command.
     scheduler: { tickSeconds: options.autoSync ? Math.max(0, Number(process.env.EQ_SCHEDULER_TICK_SECONDS ?? 30) || 0) : 0 },
-    smtp: readConfig(process.env).smtp,
+    mail: mailConfig(process.env),
     publicUrl: process.env.EQ_PUBLIC_URL ?? `http://localhost:${options.port}`,
     examplesDir: found.examplesDir,
     webDir: found.webDir,

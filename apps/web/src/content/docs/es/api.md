@@ -153,10 +153,10 @@ El API se configura con variables de entorno. Con `pnpm start` (o `pnpm run api`
 | `EQ_SYNC_INTERVAL_SECONDS` | `300` en local | Cada cuánto sincroniza sola una instalación enlazada a la nube (`0`: solo a demanda). |
 | `EQ_SCHEDULER_TICK_SECONDS` | `30` | Cada cuánto busca el API programaciones pendientes (`0`: las programaciones no se disparan en este proceso). |
 | `EQ_PUBLIC_URL` | `http://localhost:<puerto>` en local | La dirección pública de la app web, para los enlaces de las notificaciones. |
-| `EQ_SMTP_HOST` · `EQ_SMTP_PORT` · `EQ_SMTP_SECURE` · `EQ_SMTP_USER` · `EQ_SMTP_PASSWORD` · `EQ_SMTP_FROM` | — · `587` · `true` en 465 | SMTP para las notificaciones por email; sin `EQ_SMTP_HOST` el email no se ofrece. Ver [Despliegue en la nube](doc:deploy). |
+| `EQ_SMTP_HOST` · `EQ_SMTP_PORT` · `EQ_SMTP_SECURE` · `EQ_SMTP_USER` · `EQ_SMTP_PASSWORD` · `EQ_SMTP_FROM` | — · `587` · `true` en 465 | El mismo SMTP en partes, en lugar de `EQ_SMTP_URL` (que gana si están las dos). Ver [Despliegue en la nube](doc:deploy). |
 | `EQ_LOG` | — | `debug` para más detalle, `silent` para nada. Por defecto, errores y avisos. |
 | `EQ_PUBLIC_URL` | — | La dirección que abre la gente (`https://eq.example.com`): base de los enlaces de los correos y de la redirección del SSO. Obligatoria con `EQ_SMTP_URL` o `EQ_OIDC_ISSUER`. |
-| `EQ_SMTP_URL` | — | Servidor SMTP para los correos (`smtp://usuario:clave@host:587`, `smtps://…:465`). Sin ella no se envía nada. |
+| `EQ_SMTP_URL` | — | Servidor SMTP para todos los correos: enlaces para restablecer la contraseña y notificaciones (`smtp://usuario:clave@host:587`, `smtps://…:465`). Sin SMTP no se envía nada y el email no se ofrece en las notificaciones. |
 | `EQ_MAIL_FROM` | `Endpoint Quality <no-reply@localhost>` | Remitente de los correos. |
 | `EQ_METRICS` | `false` | `true` sirve `GET /metrics` para Prometheus. |
 | `EQ_METRICS_TOKEN` | — | Si está, `/metrics` pide `Authorization: Bearer <token>`. |

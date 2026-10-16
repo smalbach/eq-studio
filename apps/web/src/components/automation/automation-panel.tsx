@@ -19,7 +19,7 @@ const MESSAGES = defineMessages({
     kinds: { webhook: "Webhook (JSON)", slack: "Slack", email: "Email" } as Record<NotificationKind, string>,
     url: "URL del webhook", urlKeep: "(vacío = conservar la actual)", urlSecret: "Se guarda cifrada; solo se muestra el host y el final.", signing: "Secreto de firma HMAC (opcional, 16+ caracteres)", recipients: "Destinatarios (separados por coma)",
     notifyOn: { change: "Solo si cambia el veredicto", always: "Siempre" } as Record<string, string>, signed: "firmado",
-    emailOff: "El email necesita SMTP configurado en el servidor (EQ_SMTP_HOST).", test: "Enviar prueba", testOk: "Mensaje de prueba entregado.", testFailed: (error: string) => `La prueba falló: ${error}`, lastOk: "último envío ok", lastFailed: "último envío falló",
+    emailOff: "El email necesita SMTP configurado en el servidor (EQ_SMTP_URL).", test: "Enviar prueba", testOk: "Mensaje de prueba entregado.", testFailed: (error: string) => `La prueba falló: ${error}`, lastOk: "último envío ok", lastFailed: "último envío falló",
     statuses: { queued: "en cola", running: "en curso", cancelling: "cancelando", passed: "pasó", failed: "falló", cancelled: "cancelada", interrupted: "interrumpida", error: "error" } as Record<string, string>,
   },
   en: {
@@ -33,7 +33,7 @@ const MESSAGES = defineMessages({
     kinds: { webhook: "Webhook (JSON)", slack: "Slack", email: "Email" } as Record<NotificationKind, string>,
     url: "Webhook URL", urlKeep: "(empty = keep the current one)", urlSecret: "Stored encrypted; only its host and ending are shown.", signing: "HMAC signing secret (optional, 16+ characters)", recipients: "Recipients (comma-separated)",
     notifyOn: { change: "Only when the verdict changes", always: "Always" } as Record<string, string>, signed: "signed",
-    emailOff: "Email needs SMTP configured on the server (EQ_SMTP_HOST).", test: "Send test", testOk: "Test message delivered.", testFailed: (error: string) => `The test failed: ${error}`, lastOk: "last delivery ok", lastFailed: "last delivery failed",
+    emailOff: "Email needs SMTP configured on the server (EQ_SMTP_URL).", test: "Send test", testOk: "Test message delivered.", testFailed: (error: string) => `The test failed: ${error}`, lastOk: "last delivery ok", lastFailed: "last delivery failed",
     statuses: { queued: "queued", running: "running", cancelling: "cancelling", passed: "passed", failed: "failed", cancelled: "cancelled", interrupted: "interrupted", error: "error" } as Record<string, string>,
   },
 });
