@@ -64,6 +64,8 @@ The contract's operations, as the OpenAPI import produces them. Not edited by ha
 | `ids` | `existing` (default `"1"`) and `missing` (default `"999999"`). |
 | `operationScenarios` | Cases that **replace** an operation's generated ones. |
 | `extraScenarios` | Cases **appended** to the generated ones. |
+| `requestSchemas` | Per operation: the schema of the `body` and of each parameter (`parameters`), with no `$ref`. Filled by the OpenAPI import; it is what the negative cases break. |
+| `negativeCases` | The negative cases: `enabled`, `maxPerOperation`, `exclude`, `statuses`. |
 | `plugins` | `geo` and `pagination`. |
 | `auth` | `publicOperations`, `insufficientScope`, `apiKeyHeader`, `alternate`. |
 | `budgets` | Latency budget rules, in order. |
@@ -97,7 +99,27 @@ Texts (`description`, `label`, `name`) take a string or `{ "es": …, "en": … 
 }
 ```
 
-`flow` is `request` (a single request) or one of the chained flows: `create-read`, `replace-read`, `patch-read`, `delete-read`, `deleted-read`, `bulk-read`, `conflict`, `existing`. `auth` may be `default`, `none`, `insufficient` or `api-key`.
+`flow` is `request` (a single request) or one of the chained flows: `create-read`, `replace-read`, `patch-read`, `delete-read`, `deleted-read`, `bulk-read`, `conflict`, `existing`, `negative`. `auth` may be `default`, `none`, `insufficient` or `api-key`.
+
+### negativeCases and requestSchemas
+
+```json
+"requestSchemas": {
+  "createOrder": { "body": { "type": "object", "required": ["reference"], "additionalProperties": false,
+                             "properties": { "reference": { "type": "string", "maxLength": 32 }, "email": { "type": "string", "format": "email" } } } },
+  "listOrders": { "parameters": { "limit": { "type": "integer", "minimum": 1, "maximum": 100 } } }
+},
+"negativeCases": { "enabled": true, "maxPerOperation": 10, "exclude": ["healthCheck"], "statuses": [400, 422] }
+```
+
+| Field | Default | What it does |
+| --- | --- | --- |
+| `enabled` | `true` | Turns off every negative case of the project. |
+| `maxPerOperation` | `10` | Cap per operation: one case of each kind before a second of any. `0` generates none. |
+| `exclude` | `[]` | Operations (by `operationId`) that get no negative cases. |
+| `statuses` | the declared 4xx | The statuses that count as a rejection. Without it: the 4xx the operation declares, except 401, 403, 405, 409 and 429, or 400/422 if it declares none. |
+
+Without `requestSchemas` only the body that is not JSON is generated. Regenerating the configuration from the contract updates `requestSchemas` (the contract wins) and leaves the rest alone. Every case has a stable id (`negative-body-missing-sku`, `negative-query-type-limit`…), and in `extraScenarios` a case of your own with `"flow": "negative"` and `expectedStatuses` works the same; `rawBody` sends a body as it is. See [Functional verification](doc:funcional).
 
 ### plugins
 

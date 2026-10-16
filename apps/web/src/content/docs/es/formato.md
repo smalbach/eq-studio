@@ -64,6 +64,8 @@ Las operaciones del contrato, tal como las produce la importación de OpenAPI. N
 | `ids` | `existing` (por defecto `"1"`) y `missing` (por defecto `"999999"`). |
 | `operationScenarios` | Casos que **reemplazan** los generados de una operación. |
 | `extraScenarios` | Casos que se **añaden** a los generados. |
+| `requestSchemas` | Por operación: el schema del `body` y de cada parámetro (`parameters`), sin `$ref`. Lo rellena la importación de OpenAPI; es lo que rompen los casos negativos. |
+| `negativeCases` | Los casos negativos: `enabled`, `maxPerOperation`, `exclude`, `statuses`. |
 | `plugins` | `geo` y `pagination`. |
 | `auth` | `publicOperations`, `insufficientScope`, `apiKeyHeader`, `alternate`. |
 | `budgets` | Reglas de presupuesto de latencia, en orden. |
@@ -97,7 +99,27 @@ Los textos (`description`, `label`, `name`) aceptan una cadena o `{ "es": …, "
 }
 ```
 
-`flow` es `request` (una sola solicitud) o uno de los flujos encadenados: `create-read`, `replace-read`, `patch-read`, `delete-read`, `deleted-read`, `bulk-read`, `conflict`, `existing`. `auth` puede ser `default`, `none`, `insufficient` o `api-key`.
+`flow` es `request` (una sola solicitud) o uno de los flujos encadenados: `create-read`, `replace-read`, `patch-read`, `delete-read`, `deleted-read`, `bulk-read`, `conflict`, `existing`, `negative`. `auth` puede ser `default`, `none`, `insufficient` o `api-key`.
+
+### negativeCases y requestSchemas
+
+```json
+"requestSchemas": {
+  "createOrder": { "body": { "type": "object", "required": ["reference"], "additionalProperties": false,
+                             "properties": { "reference": { "type": "string", "maxLength": 32 }, "email": { "type": "string", "format": "email" } } } },
+  "listOrders": { "parameters": { "limit": { "type": "integer", "minimum": 1, "maximum": 100 } } }
+},
+"negativeCases": { "enabled": true, "maxPerOperation": 10, "exclude": ["healthCheck"], "statuses": [400, 422] }
+```
+
+| Campo | Por defecto | Qué hace |
+| --- | --- | --- |
+| `enabled` | `true` | Apaga todos los casos negativos del proyecto. |
+| `maxPerOperation` | `10` | Tope por operación: un caso de cada tipo antes de un segundo de cualquiera. `0` no genera ninguno. |
+| `exclude` | `[]` | Operaciones (por `operationId`) que no reciben casos negativos. |
+| `statuses` | los 4xx declarados | Los status que cuentan como rechazo. Sin él: los 4xx que declara la operación, salvo 401, 403, 405, 409 y 429, o 400/422 si no declara ninguno. |
+
+Sin `requestSchemas` solo se genera el body que no es JSON. Volver a generar la configuración desde el contrato actualiza `requestSchemas` (el contrato manda) sin tocar lo demás. Cada caso tiene un id estable (`negative-body-missing-sku`, `negative-query-type-limit`…), y en `extraScenarios` un caso propio con `"flow": "negative"` y `expectedStatuses` funciona igual; `rawBody` envía un body tal cual. Ver [Verificación funcional](doc:funcional).
 
 ### plugins
 

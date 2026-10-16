@@ -21,7 +21,7 @@ and stores, four reviews (three on product 1).
 
 | Resource | Operations |
 | --- | --- |
-| Products | `GET/POST /v1/products` (`limit`, `cursor`, `q`, `category`, `sku`), `GET/PUT/PATCH/DELETE /v1/products/{product_id}`, `POST /v1/products/bulk` (upsert by `sku`) |
+| Products | `GET/POST /v1/products` (`limit`, `cursor`, `q`, `category`, `sku`, `sort`), `GET/PUT/PATCH/DELETE /v1/products/{product_id}`, `POST /v1/products/bulk` (upsert by `sku`) |
 | Reviews | `GET/POST /v1/products/{product_id}/reviews`, `GET/DELETE /v1/products/{product_id}/reviews/{review_id}` (key answered as `id`) |
 | Stores | `GET/POST /v1/stores` (`lat`, `lon`, `radius_km`, `limit`, `cursor`), `GET/PUT/PATCH/DELETE /v1/stores/{store_id}` |
 
@@ -39,11 +39,18 @@ From code:
 ```js
 import { createMockServer } from "./apps/mock-target/server.mjs";
 
-const mock = createMockServer({ auth: true, latencyMs: 0, faults: { brokenEnvelope: false } });
+const mock = createMockServer({ auth: true, latencyMs: 0, faults: { brokenEnvelope: false, validation: undefined } });
 const { url } = await mock.listen(0); // 0 = a free port
 mock.reset();                          // back to the seed
 await mock.close();
 ```
 
 `faults.brokenEnvelope` drops the `data` member from single-resource responses: a regression the
-schema assertion must catch, used by the negative E2E test.
+schema assertion must catch, used by the negative E2E test. `faults.validation` breaks body
+validation, for the negative cases to catch: `"lenient"` accepts whatever body arrives (a 2xx to
+invalid input) and `"crash"` answers it with a 500.
+
+Every request schema is closed and enforced: a missing or unknown member, a wrong type, a `null`
+that is not nullable, a length, range, enum (`sort`) or format (`email` of a store) violation and
+a body that is not JSON are all a 422 in Problem Details; a path id that is not a positive integer
+is a 404.

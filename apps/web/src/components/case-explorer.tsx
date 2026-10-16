@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { Link, SegmentedControl, Select, TextField } from "@radix-ui/themes";
 import { Check, ChevronDown, ChevronRight, ExternalLink, Search, X } from "lucide-react";
+import { isNegativeScenario } from "@eq/runner-core";
 import { Card } from "@/components/ui/card";
 import { InfoTip } from "@/components/info-tip";
 import { MethodBadge } from "@/components/common/method-badge";
@@ -15,8 +16,9 @@ const MESSAGES = defineMessages({
     bodiesOnlyFailed: "Los cuerpos solo se guardan para los casos fallidos.", noBodies: "Sin cuerpo en la solicitud ni en la respuesta.",
     title: "Casos de la ejecución", count: (visible: number, total: number) => `· ${visible} de ${total}`,
     all: (n: number) => `Todos ${n}`, failed: (n: number) => `Fallidos ${n}`, passed: (n: number) => `Correctos ${n}`,
-    byTag: "Filtrar por tag", allTags: "Todos los tags", search: "Buscar caso", searchPlaceholder: "Buscar ruta o caso",
-    expects: (status: number) => `espera ${status} · recibe `, steps: (n: number) => `${n} pasos · `,
+    byTag: "Filtrar por tag", allTags: "Todos los tags",
+    byKind: "Filtrar por tipo de caso", allKinds: "Todos los tipos", functional: "Funcionales", negative: "Negativos", negativeTag: "negativo", search: "Buscar caso", searchPlaceholder: "Buscar ruta o caso",
+    expects: (status: number | string) => `espera ${status} · recibe `, steps: (n: number) => `${n} pasos · `,
     openInVerify: "Abrir en verificación para volver a ejecutarlo", noMatch: "Ningún caso coincide con el filtro.",
   },
   en: {
@@ -25,15 +27,16 @@ const MESSAGES = defineMessages({
     bodiesOnlyFailed: "Bodies are only saved for failed cases.", noBodies: "No body in the request or the response.",
     title: "Run cases", count: (visible: number, total: number) => `· ${visible} of ${total}`,
     all: (n: number) => `All ${n}`, failed: (n: number) => `Failed ${n}`, passed: (n: number) => `Passed ${n}`,
-    byTag: "Filter by tag", allTags: "All tags", search: "Search case", searchPlaceholder: "Search path or case",
-    expects: (status: number) => `expects ${status} · receives `, steps: (n: number) => `${n} steps · `,
+    byTag: "Filter by tag", allTags: "All tags",
+    byKind: "Filter by kind of case", allKinds: "All kinds", functional: "Functional", negative: "Negative", negativeTag: "negative", search: "Search case", searchPlaceholder: "Search path or case",
+    expects: (status: number | string) => `expects ${status} · receives `, steps: (n: number) => `${n} steps · `,
     openInVerify: "Open in verification to run it again", noMatch: "No case matches the filter.",
   },
 });
 
 type Assertion = { label: string; pass: boolean; detail: string; informative?: boolean };
 export type ExplorerStep = { ok: boolean; durationMs: number; step?: string; request: { method: string; url: string; body?: unknown }; actual: null | { status: number; body?: unknown }; assertions: Assertion[] };
-export type ExplorerEntry = { endpoint: Endpoint; scenario: { id: string; name: string; expectedStatus: number; description?: string }; result: { ok: boolean; durationMs: number; steps: ExplorerStep[] } };
+export type ExplorerEntry = { endpoint: Endpoint; scenario: { id: string; name: string; expectedStatus: number; expectedStatuses?: number[]; description?: string }; result: { ok: boolean; durationMs: number; steps: ExplorerStep[] } };
 
 /** Radix forbids an empty Select.Item value: "all tags" travels as this sentinel. */
 const ALL_TAGS = "__all__";
@@ -77,13 +80,15 @@ export function CaseExplorer({ entries, expanded, onToggle, saved, onOpenInVerif
   const [status, setStatus] = useState<"all" | "failed" | "passed">("all");
   const [query, setQuery] = useState("");
   const [tag, setTag] = useState("");
+  const [kind, setKind] = useState<"" | "functional" | "negative">("");
+  const hasNegative = useMemo(() => entries.some((entry) => isNegativeScenario(entry.scenario)), [entries]);
   const tags = useMemo(() => [...new Set(entries.map((entry) => entry.endpoint.tag))].sort(), [entries]);
   const visible = useMemo(() => {
     const needle = query.trim().toLowerCase();
     // The case opened from elsewhere (a failure, the comparison) shows whatever the filters say.
-    return entries.filter((entry) => caseKey(entry) === expanded || ((status === "all" || (status === "failed") !== entry.result.ok) && (!tag || entry.endpoint.tag === tag) && (!needle || `${entry.endpoint.method} ${entry.endpoint.path} ${entry.scenario.name} ${entry.endpoint.id}`.toLowerCase().includes(needle))))
+    return entries.filter((entry) => caseKey(entry) === expanded || ((status === "all" || (status === "failed") !== entry.result.ok) && (!tag || entry.endpoint.tag === tag) && (!kind || (kind === "negative") === isNegativeScenario(entry.scenario)) && (!needle || `${entry.endpoint.method} ${entry.endpoint.path} ${entry.scenario.name} ${entry.endpoint.id}`.toLowerCase().includes(needle))))
       .sort((a, b) => Number(a.result.ok) - Number(b.result.ok));
-  }, [entries, status, query, tag, expanded]);
+  }, [entries, status, query, tag, kind, expanded]);
   const failed = entries.filter((entry) => !entry.result.ok).length;
 
   return <Card id="case-explorer" className="overflow-hidden">
@@ -92,6 +97,7 @@ export function CaseExplorer({ entries, expanded, onToggle, saved, onOpenInVerif
       <div className="flex flex-wrap items-center gap-2">
         <SegmentedControl.Root size="1" value={status} onValueChange={(value) => setStatus(value as typeof status)}>{([["all", t.all(entries.length)], ["failed", t.failed(failed)], ["passed", t.passed(entries.length - failed)]] as const).map(([value, label]) => <SegmentedControl.Item key={value} value={value}>{label}</SegmentedControl.Item>)}</SegmentedControl.Root>
         <Select.Root size="1" value={tag || ALL_TAGS} onValueChange={(value) => setTag(value === ALL_TAGS ? "" : value)}><Select.Trigger aria-label={t.byTag}/><Select.Content><Select.Item value={ALL_TAGS}>{t.allTags}</Select.Item>{tags.map((item) => <Select.Item key={item} value={item}>{item}</Select.Item>)}</Select.Content></Select.Root>
+        {hasNegative && <Select.Root size="1" value={kind || ALL_TAGS} onValueChange={(value) => setKind(value === ALL_TAGS ? "" : value as typeof kind)}><Select.Trigger aria-label={t.byKind}/><Select.Content><Select.Item value={ALL_TAGS}>{t.allKinds}</Select.Item><Select.Item value="functional">{t.functional}</Select.Item><Select.Item value="negative">{t.negative}</Select.Item></Select.Content></Select.Root>}
         <label><span className="sr-only">{t.search}</span><TextField.Root size="1" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t.searchPlaceholder} className="w-48"><TextField.Slot><Search className="size-3.5"/></TextField.Slot></TextField.Root></label>
       </div>
     </div>
@@ -103,7 +109,8 @@ export function CaseExplorer({ entries, expanded, onToggle, saved, onOpenInVerif
           <MethodBadge method={entry.endpoint.method} className="shrink-0"/>
           <span className="min-w-0 truncate font-mono text-[11px] font-semibold">{entry.endpoint.path}</span>
           <span className="min-w-0 truncate text-[11px] text-slate-500">· {entry.scenario.name}</span>
-          <span className="ml-auto shrink-0 font-mono text-[11px] text-slate-500">{t.expects(entry.scenario.expectedStatus)}<span className={entry.result.ok ? "" : "text-rose-600"}>{decisive?.actual?.status ?? "ERR"}</span> · {entry.result.steps.length > 1 ? t.steps(entry.result.steps.length) : ""}{entry.result.durationMs} ms</span>
+          {isNegativeScenario(entry.scenario) && <span className="shrink-0 rounded bg-amber-100 px-1.5 text-[10px] font-medium text-amber-700">{t.negativeTag}</span>}
+          <span className="ml-auto shrink-0 font-mono text-[11px] text-slate-500">{t.expects(entry.scenario.expectedStatuses?.join("/") ?? (isNegativeScenario(entry.scenario) ? "4xx" : entry.scenario.expectedStatus))}<span className={entry.result.ok ? "" : "text-rose-600"}>{decisive?.actual?.status ?? "ERR"}</span> · {entry.result.steps.length > 1 ? t.steps(entry.result.steps.length) : ""}{entry.result.durationMs} ms</span>
         </button>
         {open && <div className="space-y-2 bg-slate-50/60 px-5 pb-4 pt-1">
           {entry.scenario.description && <p className="text-[11px] leading-5 text-slate-500">{entry.scenario.description}</p>}

@@ -3,9 +3,10 @@
  * whole Endpoint Quality matrix can run against it with no network and no database.
  *
  * It is deliberately strict where real APIs tend to be lax — 404 before validation on a missing
- * id, 409 on a natural key, 422 on a corrupt cursor or an empty PATCH, Problem Details on every
- * error, 405 on a known path with the wrong method — because those are the cases the engine
- * exists to check. Every answer matches `openapi.mjs`, which the engine validates against.
+ * id, 409 on a natural key, 422 on a corrupt cursor, an empty PATCH or any body or parameter the
+ * contract rejects (a wrong type, a null, a bound, an enum, a format, an undeclared member, a
+ * body that is not JSON), Problem Details on every error, 405 on a known path with the wrong
+ * method — because those are the cases the engine exists to check. Every answer matches `openapi.mjs`, which the engine validates against.
  *
  * Zero dependencies and in-memory state reset to a deterministic seed: ids 1..4 in every
  * top-level collection, so the engine's "existing" id `1` is always there and `999999` never is.
@@ -18,6 +19,11 @@ import { openApiDocument } from "./openapi.mjs";
 const PROBLEM_BASE = "https://mock-store.example/problems";
 const DEFAULT_LIMIT = 20;
 const DEFAULT_RADIUS_KM = 5;
+const SORTS = {
+  name: (a, b) => a.name.localeCompare(b.name),
+  price: (a, b) => a.price - b.price || a.product_id - b.product_id,
+  "-price": (a, b) => b.price - a.price || a.product_id - b.product_id,
+};
 
 // The seeded stores sit around one fictional town centre: two within 1 km, the other two within
 // 20 km, none near (0, 0). That spread is what lets a geographic case tell a real radius filter
@@ -32,10 +38,10 @@ function seedState() {
     { product_id: 4, sku: "SKU-0004", name: "Ceramic Mug", description: "350 ml.", category: "kitchen", price: 8.5, stock: 200 },
   ];
   const stores = [
-    { store_id: 1, name: "Market Square", address: "1 Market Square", lat: 40.002, lon: -100, phone: "+1 555 0101" },
-    { store_id: 2, name: "Station Road", address: "8 Station Road", lat: 40, lon: -100.006, phone: null },
-    { store_id: 3, name: "Riverside", address: "220 River Lane", lat: 40.07, lon: -100, phone: "+1 555 0103" },
-    { store_id: 4, name: "Hillside", address: "3 Hill Road", lat: 39.88, lon: -100, phone: null },
+    { store_id: 1, name: "Market Square", address: "1 Market Square", lat: 40.002, lon: -100, phone: "+1 555 0101", email: "market@mock-store.example" },
+    { store_id: 2, name: "Station Road", address: "8 Station Road", lat: 40, lon: -100.006, phone: null, email: null },
+    { store_id: 3, name: "Riverside", address: "220 River Lane", lat: 40.07, lon: -100, phone: "+1 555 0103", email: "riverside@mock-store.example" },
+    { store_id: 4, name: "Hillside", address: "3 Hill Road", lat: 39.88, lon: -100, phone: null, email: null },
   ];
   const reviews = [
     { id: 1, product_id: 1, store_id: 1, rating: 5, author: "Robin", comment: "Bright enough to read by." },
@@ -83,6 +89,7 @@ const STORE_FIELDS = {
   lat: { type: "number", minimum: -90, maximum: 90, required: true },
   lon: { type: "number", minimum: -180, maximum: 180, required: true },
   phone: { type: "string", nullable: true, max: 32, default: null },
+  email: { type: "string", nullable: true, max: 120, format: "email", default: null },
 };
 const REVIEW_FIELDS = {
   rating: { type: "integer", minimum: 1, maximum: 5, required: true },
@@ -90,6 +97,15 @@ const REVIEW_FIELDS = {
   comment: { type: "string", max: 2000, default: "" },
   store_id: { type: "integer", nullable: true, minimum: 1, default: null },
 };
+
+const EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+
+/** Members the schema does not declare: the request schemas are closed, so they are a 422 and
+ * not something quietly dropped — a typo in a field name would otherwise look like a success. */
+function undeclared(input, fields) {
+  const unknown = Object.keys(input).filter((name) => !(name in fields));
+  return unknown.length ? [`unknown field${unknown.length > 1 ? "s" : ""}: ${unknown.join(", ")}`] : [];
+}
 
 function fieldError(name, value, spec) {
   if (value === null) return spec.nullable ? null : `${name} may not be null`;
@@ -99,6 +115,7 @@ function fieldError(name, value, spec) {
   if (typeof value === "string") {
     if (spec.min !== undefined && value.length < spec.min) return `${name} must not be empty`;
     if (spec.max !== undefined && value.length > spec.max) return `${name} is longer than ${spec.max} characters`;
+    if (spec.format === "email" && !EMAIL.test(value)) return `${name} is not an email address`;
   }
   if (typeof value === "number") {
     if (spec.minimum !== undefined && value < spec.minimum) return `${name} must be at least ${spec.minimum}`;
@@ -113,7 +130,7 @@ function fieldError(name, value, spec) {
  */
 function validateFull(input, fields) {
   if (!input || typeof input !== "object" || Array.isArray(input)) throw invalid("The body must be a JSON object.");
-  const errors = [];
+  const errors = undeclared(input, fields);
   const out = {};
   for (const [name, spec] of Object.entries(fields)) {
     if (!(name in input)) {
@@ -131,7 +148,7 @@ function validateFull(input, fields) {
 /** The writable fields a PATCH carries. None at all is a 422, not a 200 that changed nothing. */
 function validatePartial(input, fields) {
   if (!input || typeof input !== "object" || Array.isArray(input)) throw invalid("The body must be a JSON object.");
-  const errors = [];
+  const errors = undeclared(input, fields);
   const out = {};
   for (const [name, value] of Object.entries(input)) {
     const spec = fields[name];
@@ -239,7 +256,7 @@ function authorize(req, method) {
 // --- routes --------------------------------------------------------------------------------
 
 /**
- * @param {{ auth?: boolean, latencyMs?: number, faults?: { brokenEnvelope?: boolean } }} [options]
+ * @param {{ auth?: boolean, latencyMs?: number, faults?: { brokenEnvelope?: boolean, validation?: "lenient" | "crash" } }} [options]
  */
 export function createMockServer({ auth = false, latencyMs = 0, faults = {} } = {}) {
   let state = seedState();
@@ -248,6 +265,20 @@ export function createMockServer({ auth = false, latencyMs = 0, faults = {} } = 
   /** A single resource, in its envelope — unless the fault switch says to forget it, which is
    * the kind of regression the schema assertion has to catch. */
   const one = (row, status = 200) => ({ status, body: faults.brokenEnvelope ? { ...row } : { data: row } });
+
+  /** Body validation — unless the fault switch says to accept whatever comes (`lenient`) or to
+   * break on it (`crash`): the two regressions the negative cases have to catch. */
+  const withFaults = (validate) => (input, fields) => {
+    try {
+      return validate(input, fields);
+    } catch (error) {
+      if (faults.validation === "crash") throw new TypeError(`Cannot read properties of undefined (${error.message})`);
+      if (faults.validation === "lenient" && input && typeof input === "object" && !Array.isArray(input)) return { ...Object.fromEntries(Object.entries(fields).filter(([, spec]) => !spec.required).map(([name, spec]) => [name, spec.default])), ...input };
+      throw error;
+    }
+  };
+  const full = withFaults(validateFull);
+  const partial = withFaults(validatePartial);
 
   function findProduct(id) {
     const row = state.products.get(Number(id));
@@ -291,14 +322,17 @@ export function createMockServer({ auth = false, latencyMs = 0, faults = {} } = 
           const q = textParameter(query, "q")?.toLowerCase();
           const category = textParameter(query, "category");
           const sku = textParameter(query, "sku");
+          const sort = textParameter(query, "sort");
+          if (sort !== undefined && !SORTS[sort]) throw invalid(`sort must be one of ${Object.keys(SORTS).join(", ")}.`);
           const rows = [...state.products.values()].filter((row) =>
             (!q || row.name.toLowerCase().includes(q) || (row.description ?? "").toLowerCase().includes(q)) &&
             (!category || row.category === category) &&
             (!sku || row.sku === sku));
+          if (sort) rows.sort(SORTS[sort]);
           return { status: 200, body: page(rows, query, url) };
         },
         POST: ({ body }) => {
-          const fields = validateFull(body, PRODUCT_FIELDS);
+          const fields = full(body, PRODUCT_FIELDS);
           assertUniqueSku(fields.sku);
           const row = { product_id: state.next.product++, ...fields };
           state.products.set(row.product_id, row);
@@ -310,12 +344,15 @@ export function createMockServer({ auth = false, latencyMs = 0, faults = {} } = 
       pattern: /^\/v1\/products\/bulk$/,
       methods: {
         POST: ({ body }) => {
-          const records = body?.records;
+          if (!body || typeof body !== "object" || Array.isArray(body)) throw invalid("The body must be a JSON object.");
+          const extra = undeclared(body, { records: true });
+          if (extra.length) throw invalid(extra[0]);
+          const records = body.records;
           if (!Array.isArray(records) || records.length < 1 || records.length > 100) throw invalid("records must be a list of 1 to 100 products.");
           // Validated as a whole before anything is written: a bulk that fails halfway would
           // leave the caller unable to tell which records landed.
           const validated = records.map((record, index) => {
-            try { return validateFull(record, PRODUCT_FIELDS); } catch (error) { throw invalid(`records[${index}]: ${error.message}`); }
+            try { return full(record, PRODUCT_FIELDS); } catch (error) { throw error instanceof HttpError ? invalid(`records[${index}]: ${error.message}`) : error; }
           });
           const counters = { created: 0, updated: 0, unchanged: 0 };
           for (const fields of validated) {
@@ -341,14 +378,14 @@ export function createMockServer({ auth = false, latencyMs = 0, faults = {} } = 
         GET: ({ params }) => one(findProduct(params.product_id)),
         PUT: ({ params, body }) => {
           const row = findProduct(params.product_id);
-          const fields = validateFull(body, PRODUCT_FIELDS);
+          const fields = full(body, PRODUCT_FIELDS);
           assertUniqueSku(fields.sku, row.product_id);
           Object.assign(row, fields);
           return one(row);
         },
         PATCH: ({ params, body }) => {
           const row = findProduct(params.product_id);
-          const fields = validatePartial(body, PRODUCT_FIELDS);
+          const fields = partial(body, PRODUCT_FIELDS);
           if (fields.sku !== undefined) assertUniqueSku(fields.sku, row.product_id);
           Object.assign(row, fields);
           return one(row);
@@ -370,7 +407,7 @@ export function createMockServer({ auth = false, latencyMs = 0, faults = {} } = 
         },
         POST: ({ params, body }) => {
           const product = findProduct(params.product_id);
-          const fields = validateFull(body, REVIEW_FIELDS);
+          const fields = full(body, REVIEW_FIELDS);
           assertStoreExists(fields.store_id);
           const row = { id: state.next.review++, product_id: product.product_id, ...fields };
           state.reviews.set(row.id, row);
@@ -411,7 +448,7 @@ export function createMockServer({ auth = false, latencyMs = 0, faults = {} } = 
           return { status: 200, body: page(rows, query, url) };
         },
         POST: ({ body }) => {
-          const fields = validateFull(body, STORE_FIELDS);
+          const fields = full(body, STORE_FIELDS);
           assertUniqueStoreName(fields.name);
           const row = { store_id: state.next.store++, ...fields };
           state.stores.set(row.store_id, row);
@@ -425,14 +462,14 @@ export function createMockServer({ auth = false, latencyMs = 0, faults = {} } = 
         GET: ({ params }) => one(findStore(params.store_id)),
         PUT: ({ params, body }) => {
           const row = findStore(params.store_id);
-          const fields = validateFull(body, STORE_FIELDS);
+          const fields = full(body, STORE_FIELDS);
           assertUniqueStoreName(fields.name, row.store_id);
           Object.assign(row, fields);
           return one(row);
         },
         PATCH: ({ params, body }) => {
           const row = findStore(params.store_id);
-          const fields = validatePartial(body, STORE_FIELDS);
+          const fields = partial(body, STORE_FIELDS);
           if (fields.name !== undefined) assertUniqueStoreName(fields.name, row.store_id);
           Object.assign(row, fields);
           return one(row);
@@ -478,7 +515,7 @@ export function createMockServer({ auth = false, latencyMs = 0, faults = {} } = 
       result = await handle(req);
     } catch (error) {
       const known = error instanceof HttpError ? error : new HttpError(500, "Internal Server Error", "Unexpected error.");
-      if (!(error instanceof HttpError)) console.error(error);
+      if (!(error instanceof HttpError) && !faults.validation) console.error(error);
       result = { status: known.status, problem: true, headers: known.headers, body: { type: `${PROBLEM_BASE}/${slug(known.title)}`, title: known.title, status: known.status, detail: known.message } };
     }
     if (latencyMs > 0) await new Promise((resolve) => setTimeout(resolve, latencyMs));

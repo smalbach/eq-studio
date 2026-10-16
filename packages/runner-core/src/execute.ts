@@ -21,7 +21,11 @@ export type CaseRequest = {
   /** The templated path, as the OpenAPI document names it. */
   operationPath: string;
   expectedStatus: number;
+  /** Any of these passes, when a case accepts more than one; `expectedStatus` otherwise. */
+  expectedStatuses?: number[];
   body?: unknown;
+  /** Sent exactly as written, as JSON, in place of `body`: a body that is not valid JSON. */
+  rawBody?: string;
   headers?: Record<string, string>;
   /** The credential the OpenAPI document is read with. Not the case's own headers: a 401 case
    * sends none on purpose, and the document may sit behind the same authentication. */
@@ -92,6 +96,16 @@ export function clearSpecCache() {
 
 const SECRET_HEADER = /authorization|api-key|apikey|token|cookie|secret/i;
 
+/** What the status assertion says. For a case that sends bad input on purpose, a 2xx and a 5xx
+ * each get their own diagnosis: the first accepted the input, the second broke on it. */
+function statusDetail(status: number, matches: boolean, accepted: number[], rejectsInput: boolean, locale: Locale) {
+  const received = tr(locale, `Recibido ${status}`, `Received ${status}`);
+  if (matches || !rejectsInput) return received;
+  if (status >= 500) return tr(locale, `${received}: una entrada inválida debe ser un 4xx (${accepted.join("/")}), nunca un error del servidor`, `${received}: invalid input must be a 4xx (${accepted.join("/")}), never a server error`);
+  if (status < 300) return tr(locale, `${received}: la API aceptó una entrada inválida`, `${received}: the API accepted invalid input`);
+  return received;
+}
+
 export async function executeCase(input: CaseRequest, fetchImpl: typeof fetch = fetch): Promise<CaseResult> {
   const locale: Locale = input.locale === "en" ? "en" : "es";
   const t = <V,>(es: V, en: V) => tr(locale, es, en);
@@ -105,8 +119,9 @@ export async function executeCase(input: CaseRequest, fetchImpl: typeof fetch = 
     const method = input.method.toUpperCase();
     const supportsBody = !["GET", "HEAD"].includes(method);
     const headers = { Accept: "application/json", ...(input.headers ?? {}) } as Record<string, string>;
-    if (supportsBody && input.body !== undefined) headers["Content-Type"] = "application/json";
-    const response = await fetchImpl(target, { method, headers, body: supportsBody && input.body !== undefined ? JSON.stringify(input.body) : undefined, signal: controller.signal });
+    const payload = input.rawBody ?? (input.body !== undefined ? JSON.stringify(input.body) : undefined);
+    if (supportsBody && payload !== undefined) headers["Content-Type"] = "application/json";
+    const response = await fetchImpl(target, { method, headers, body: supportsBody ? payload : undefined, signal: controller.signal });
     clearTimeout(timeout);
     // Extra samples are taken **only on safe methods**. Repeating a POST would create N
     // resources and repeating a DELETE would 404 on the second one: the measurement would
@@ -130,7 +145,11 @@ export async function executeCase(input: CaseRequest, fetchImpl: typeof fetch = 
     const raw = await response.text();
     let body: unknown = raw;
     if (contentType.includes("json") && raw) { try { body = JSON.parse(raw); } catch { body = raw; } }
-    const statusMatches = response.status === input.expectedStatus;
+    const accepted = input.expectedStatuses?.length ? input.expectedStatuses : [input.expectedStatus];
+    const statusMatches = accepted.includes(response.status);
+    // The status the response is checked against: the one received, when it is one of those
+    // accepted, so a 404 accepted in place of a 422 is validated against the 404's schema.
+    const checkedStatus = statusMatches ? response.status : input.expectedStatus;
     const isObject = typeof body === "object" && body !== null;
     const record = (isObject ? body : {}) as Record<string, unknown>;
     const shape = input.responseShape ?? "";
@@ -150,7 +169,7 @@ export async function executeCase(input: CaseRequest, fetchImpl: typeof fetch = 
     let specError: string | null = null;
     try {
       const spec = await loadSpec(fetchImpl, resolveTarget(input.baseUrl, input.specUrl || DEFAULT_SPEC_PATH), input.specHeaders ?? {}, locale);
-      const declaredSchema = responseSchema(spec, input.operationPath, input.method, input.expectedStatus, contentType);
+      const declaredSchema = responseSchema(spec, input.operationPath, input.method, checkedStatus, contentType);
       if (declaredSchema) {
         expectedSchema = declaredSchema;
         schemaErrors = validateJson(body, expectedSchema, "$", [], locale);
@@ -175,7 +194,7 @@ export async function executeCase(input: CaseRequest, fetchImpl: typeof fetch = 
         : specError
           ? t(`No se pudo cargar el schema: ${specError}. Se verificó la forma ${shapeName}`, `Could not load the schema: ${specError}. The ${shapeName} shape was verified`)
           : schemaValid === null
-            ? t(`OpenAPI no declara ${input.expectedStatus} para esta operación; se verificó la forma ${shapeName}`, `OpenAPI declares no ${input.expectedStatus} for this operation; the ${shapeName} shape was verified`)
+            ? t(`OpenAPI no declara ${checkedStatus} para esta operación; se verificó la forma ${shapeName}`, `OpenAPI declares no ${checkedStatus} for this operation; the ${shapeName} shape was verified`)
             : schemaValid
               ? t("JSON válido contra el schema", "JSON valid against the schema")
               : (schemaErrors ?? []).join(" · ");
@@ -185,11 +204,11 @@ export async function executeCase(input: CaseRequest, fetchImpl: typeof fetch = 
       // contract says is unwrapped (a health check) with no failing assertion to show for it.
       ok: statusMatches && contentTypeMatches && schemaPass && (!latency || latency.pass || Boolean(latency.informative)),
       durationMs,
-      request: { method: input.method, url: target.toString(), headers: Object.fromEntries(Object.entries(headers).map(([key, value]) => [key, SECRET_HEADER.test(key) ? "••••••••" : value])), body: input.body ?? null },
-      expected: { status: input.expectedStatus, responseShape: shape, contentType: shape === "No body" ? null : shape === "ProblemDetails" ? "application/problem+json" : "application/json", schema: expectedSchema, schemaDiagnostic: specError ?? (notImplemented ? t("La API respondió 405: la operación no está implementada", "The API answered 405: the operation is not implemented") : schemaValid === null ? t(`OpenAPI no declara ${input.expectedStatus} para esta operación`, `OpenAPI declares no ${input.expectedStatus} for this operation`) : null) },
+      request: { method: input.method, url: target.toString(), headers: Object.fromEntries(Object.entries(headers).map(([key, value]) => [key, SECRET_HEADER.test(key) ? "••••••••" : value])), body: input.rawBody ?? input.body ?? null },
+      expected: { status: input.expectedStatus, responseShape: shape, contentType: shape === "No body" ? null : shape === "ProblemDetails" ? "application/problem+json" : "application/json", schema: expectedSchema, schemaDiagnostic: specError ?? (notImplemented ? t("La API respondió 405: la operación no está implementada", "The API answered 405: the operation is not implemented") : schemaValid === null ? t(`OpenAPI no declara ${checkedStatus} para esta operación`, `OpenAPI declares no ${checkedStatus} for this operation`) : null), ...(accepted.length > 1 ? { statuses: accepted } : {}) },
       actual: { status: response.status, statusText: response.statusText, contentType, headers: Object.fromEntries(response.headers.entries()), body },
       assertions: [
-        { label: `Status ${input.expectedStatus}`, pass: statusMatches, detail: notImplemented ? t(`Recibido 405: ${method} ${input.operationPath} no está implementado en la API`, `Received 405: ${method} ${input.operationPath} is not implemented in the API`) : t(`Recibido ${response.status}`, `Received ${response.status}`) },
+        { label: `Status ${accepted.join(" | ")}`, pass: statusMatches, detail: notImplemented ? t(`Recibido 405: ${method} ${input.operationPath} no está implementado en la API`, `Received 405: ${method} ${input.operationPath} is not implemented in the API`) : statusDetail(response.status, statusMatches, accepted, input.expectedStatuses !== undefined, locale) },
         { label: "Schema OpenAPI", pass: schemaPass, detail: schemaDetail },
         { label: "Content-Type", pass: contentTypeMatches, detail: contentType || t("Sin Content-Type", "No Content-Type") },
         ...(latency ? [latency] : []),
@@ -197,6 +216,6 @@ export async function executeCase(input: CaseRequest, fetchImpl: typeof fetch = 
       latency: { samples: latencies, p50: percentile(latencies, 50), p95: percentile(latencies, 95), budgetMs: budget?.ms ?? null },
     };
   } catch (error) {
-    return { ok: false, durationMs: Math.round(performance.now() - started), error: error instanceof Error ? error.message : t("No se pudo ejecutar la solicitud", "Could not run the request"), request: { method: input.method, url: `${input.baseUrl}${input.path}`, body: input.body ?? null }, expected: { status: input.expectedStatus, responseShape: input.responseShape }, actual: null, assertions: [{ label: t("Conexión con la API", "API connection"), pass: false, detail: t("La API no respondió", "The API did not answer") }] };
+    return { ok: false, durationMs: Math.round(performance.now() - started), error: error instanceof Error ? error.message : t("No se pudo ejecutar la solicitud", "Could not run the request"), request: { method: input.method, url: `${input.baseUrl}${input.path}`, body: input.rawBody ?? input.body ?? null }, expected: { status: input.expectedStatus, responseShape: input.responseShape }, actual: null, assertions: [{ label: t("Conexión con la API", "API connection"), pass: false, detail: t("La API no respondió", "The API did not answer") }] };
   }
 }

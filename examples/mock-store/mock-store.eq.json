@@ -21,7 +21,7 @@
         "summary": "List products",
         "tag": "products",
         "statuses": [200, 401, 422],
-        "parameters": ["limit", "cursor", "q", "category", "sku"]
+        "parameters": ["limit", "cursor", "q", "category", "sku", "sort"]
       },
       {
         "id": "createProduct",
@@ -184,6 +184,26 @@
       },
       "updateStore": { "body": { "phone": "+1 555 0191" } }
     },
+    "requestSchemas": {
+      "listProducts": { "parameters": { "limit": { "type": "integer", "minimum": 1, "maximum": 100, "default": 20, "example": 10 }, "cursor": { "type": "string", "example": "eyJvZmZzZXQiOjJ9" }, "q": { "type": "string", "minLength": 1, "example": "lamp" }, "category": { "type": "string", "minLength": 1, "example": "lighting" }, "sku": { "type": "string", "minLength": 1, "example": "SKU-0001" }, "sort": { "type": "string", "enum": ["name", "price", "-price"], "example": "price" } } },
+      "createProduct": { "body": { "type": "object", "required": ["sku", "name", "category", "price"], "properties": { "sku": { "type": "string", "minLength": 1, "maxLength": 64, "example": "SKU-1001" }, "name": { "type": "string", "minLength": 1, "maxLength": 200, "example": "Walnut Desk" }, "description": { "type": ["string", "null"], "maxLength": 2000 }, "category": { "type": "string", "minLength": 1, "maxLength": 64, "example": "furniture" }, "price": { "type": "number", "minimum": 0, "example": 249 }, "stock": { "type": "integer", "minimum": 0, "default": 0 } }, "additionalProperties": false } },
+      "bulkUpsertProducts": { "body": { "type": "object", "required": ["records"], "properties": { "records": { "type": "array", "minItems": 1, "maxItems": 100, "items": { "type": "object", "required": ["sku", "name", "category", "price"], "properties": { "sku": { "type": "string", "minLength": 1, "maxLength": 64, "example": "SKU-1001" }, "name": { "type": "string", "minLength": 1, "maxLength": 200, "example": "Walnut Desk" }, "description": { "type": ["string", "null"], "maxLength": 2000 }, "category": { "type": "string", "minLength": 1, "maxLength": 64, "example": "furniture" }, "price": { "type": "number", "minimum": 0, "example": 249 }, "stock": { "type": "integer", "minimum": 0, "default": 0 } }, "additionalProperties": false } } }, "additionalProperties": false } },
+      "getProduct": { "parameters": { "product_id": { "type": "integer", "minimum": 1 } } },
+      "replaceProduct": { "parameters": { "product_id": { "type": "integer", "minimum": 1 } }, "body": { "type": "object", "required": ["sku", "name", "category", "price"], "properties": { "sku": { "type": "string", "minLength": 1, "maxLength": 64, "example": "SKU-1001" }, "name": { "type": "string", "minLength": 1, "maxLength": 200, "example": "Walnut Desk" }, "description": { "type": ["string", "null"], "maxLength": 2000 }, "category": { "type": "string", "minLength": 1, "maxLength": 64, "example": "furniture" }, "price": { "type": "number", "minimum": 0, "example": 249 }, "stock": { "type": "integer", "minimum": 0, "default": 0 } }, "additionalProperties": false } },
+      "updateProduct": { "parameters": { "product_id": { "type": "integer", "minimum": 1 } }, "body": { "type": "object", "minProperties": 1, "properties": { "price": { "type": "number", "minimum": 0, "example": 21.9 }, "sku": { "type": "string", "minLength": 1, "maxLength": 64 }, "name": { "type": "string", "minLength": 1, "maxLength": 200 }, "description": { "type": ["string", "null"], "maxLength": 2000 }, "category": { "type": "string", "minLength": 1, "maxLength": 64 }, "stock": { "type": "integer", "minimum": 0 } }, "additionalProperties": false } },
+      "deleteProduct": { "parameters": { "product_id": { "type": "integer", "minimum": 1 } } },
+      "listProductReviews": { "parameters": { "product_id": { "type": "integer", "minimum": 1 }, "limit": { "type": "integer", "minimum": 1, "maximum": 100, "default": 20, "example": 10 }, "cursor": { "type": "string", "example": "eyJvZmZzZXQiOjJ9" } } },
+      "createProductReview": { "parameters": { "product_id": { "type": "integer", "minimum": 1 } }, "body": { "type": "object", "required": ["rating", "author"], "properties": { "rating": { "type": "integer", "minimum": 1, "maximum": 5, "example": 4 }, "author": { "type": "string", "minLength": 1, "maxLength": 80, "example": "Sam" }, "comment": { "type": "string", "maxLength": 2000, "default": "" }, "store_id": { "type": ["integer", "null"], "minimum": 1 } }, "additionalProperties": false } },
+      "getProductReview": { "parameters": { "product_id": { "type": "integer", "minimum": 1 }, "review_id": { "type": "integer", "minimum": 1 } } },
+      "deleteProductReview": { "parameters": { "product_id": { "type": "integer", "minimum": 1 }, "review_id": { "type": "integer", "minimum": 1 } } },
+      "listStores": { "parameters": { "limit": { "type": "integer", "minimum": 1, "maximum": 100, "default": 20, "example": 10 }, "cursor": { "type": "string", "example": "eyJvZmZzZXQiOjJ9" }, "lat": { "type": "number", "minimum": -90, "maximum": 90, "example": 40 }, "lon": { "type": "number", "minimum": -180, "maximum": 180, "example": -100 }, "radius_km": { "type": "number", "exclusiveMinimum": 0, "maximum": 100, "default": 5, "example": 5 } } },
+      "createStore": { "body": { "type": "object", "required": ["name", "address", "lat", "lon"], "properties": { "name": { "type": "string", "minLength": 1, "maxLength": 120, "example": "Harbour Street" }, "address": { "type": "string", "minLength": 1, "maxLength": 200, "example": "12 Harbour Street" }, "lat": { "type": "number", "minimum": -90, "maximum": 90, "example": 40.01 }, "lon": { "type": "number", "minimum": -180, "maximum": 180, "example": -100.01 }, "phone": { "type": ["string", "null"], "maxLength": 32 }, "email": { "type": ["string", "null"], "format": "email", "maxLength": 120 } }, "additionalProperties": false } },
+      "getStore": { "parameters": { "store_id": { "type": "integer", "minimum": 1 } } },
+      "replaceStore": { "parameters": { "store_id": { "type": "integer", "minimum": 1 } }, "body": { "type": "object", "required": ["name", "address", "lat", "lon"], "properties": { "name": { "type": "string", "minLength": 1, "maxLength": 120, "example": "Harbour Street" }, "address": { "type": "string", "minLength": 1, "maxLength": 200, "example": "12 Harbour Street" }, "lat": { "type": "number", "minimum": -90, "maximum": 90, "example": 40.01 }, "lon": { "type": "number", "minimum": -180, "maximum": 180, "example": -100.01 }, "phone": { "type": ["string", "null"], "maxLength": 32 }, "email": { "type": ["string", "null"], "format": "email", "maxLength": 120 } }, "additionalProperties": false } },
+      "updateStore": { "parameters": { "store_id": { "type": "integer", "minimum": 1 } }, "body": { "type": "object", "minProperties": 1, "properties": { "phone": { "type": ["string", "null"], "maxLength": 32, "example": "+1 555 0199" }, "name": { "type": "string", "minLength": 1, "maxLength": 120 }, "address": { "type": "string", "minLength": 1, "maxLength": 200 }, "lat": { "type": "number", "minimum": -90, "maximum": 90 }, "lon": { "type": "number", "minimum": -180, "maximum": 180 }, "email": { "type": ["string", "null"], "format": "email", "maxLength": 120 } }, "additionalProperties": false } },
+      "deleteStore": { "parameters": { "store_id": { "type": "integer", "minimum": 1 } } }
+    },
+    "negativeCases": { "enabled": true, "maxPerOperation": 10, "exclude": [] },
     "parameterSamples": {
       "limit": [
         { "value": "10" },
@@ -241,6 +261,10 @@
           "value": "SKU-0001",
           "description": { "es": "Clave natural exacta: cero o un producto.", "en": "Exact natural key: zero or one product." }
         }
+      ],
+      "sort": [
+        { "value": "price", "description": { "es": "Ordena por precio ascendente.", "en": "Sorts by ascending price." } },
+        { "value": "-price", "description": { "es": "Ordena por precio descendente.", "en": "Sorts by descending price." } }
       ]
     },
     "plugins": {

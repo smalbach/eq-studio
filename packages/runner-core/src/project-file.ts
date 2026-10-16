@@ -28,13 +28,24 @@ export function validateProject(project: unknown): string[] {
     if (!Array.isArray(operation.statuses) || operation.statuses.some((status) => !Number.isInteger(status))) errors.push(`${at}.statuses: list of HTTP statuses`);
     if (!Array.isArray(operation.parameters)) errors.push(`${at}.parameters: list of names`);
   });
-  for (const key of ["bodies", "responseShapes", "operationKinds", "operationScenarios", "extraScenarios"] as const) {
+  for (const key of ["bodies", "responseShapes", "operationKinds", "operationScenarios", "extraScenarios", "requestSchemas"] as const) {
     const map = project[key];
     if (map === undefined) continue;
     if (!isRecord(map)) { errors.push(`project.${key}: must be an object keyed by operationId`); continue; }
     for (const id of Object.keys(map)) if (!ids.has(id)) errors.push(`project.${key}.${id}: no such operation`);
   }
   if (project.budgets !== undefined && !Array.isArray(project.budgets)) errors.push("project.budgets: must be a list of rules");
+  const negative = project.negativeCases;
+  if (negative !== undefined) {
+    if (!isRecord(negative)) errors.push("project.negativeCases: must be an object");
+    else {
+      if (negative.enabled !== undefined && typeof negative.enabled !== "boolean") errors.push("project.negativeCases.enabled: true or false");
+      if (negative.maxPerOperation !== undefined && (!Number.isInteger(negative.maxPerOperation) || Number(negative.maxPerOperation) < 0)) errors.push("project.negativeCases.maxPerOperation: a whole number, 0 or more");
+      if (negative.exclude !== undefined && !Array.isArray(negative.exclude)) errors.push("project.negativeCases.exclude: list of operationIds");
+      else for (const id of (negative.exclude as unknown[] | undefined) ?? []) if (!ids.has(String(id))) errors.push(`project.negativeCases.exclude: no such operation "${String(id)}"`);
+      if (negative.statuses !== undefined && (!Array.isArray(negative.statuses) || negative.statuses.some((status) => !Number.isInteger(status) || status < 400 || status > 499))) errors.push("project.negativeCases.statuses: list of 4xx statuses");
+    }
+  }
   return errors;
 }
 
