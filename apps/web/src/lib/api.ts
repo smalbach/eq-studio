@@ -61,6 +61,12 @@ export type StepRecord = { step?: string; method: string; url: string; status: n
 export type ApiRunCase = { id: string; runId: string; position: number; operationId: string; scenarioId: string; name: string; method: string; path: string; expectedStatus: number; status: "queued" | "running" | "passed" | "failed" | "blocked" | "skipped"; durationMs: number | null; steps?: StepRecord[] | null };
 export type ApiRun = { id: string; projectId: string; environmentId: string; kind: "functional" | "load"; status: RunStatus; scope: string; totals: RunTotals; createdAt: string; startedAt: string | null; finishedAt: string | null; durationMs: number | null; error: string | null; plan?: Record<string, unknown>; report?: Record<string, unknown> | null; cases?: ApiRunCase[] };
 
+export type ScheduleView = { id: string; name: string; environmentId: string; cron: string; kind: "functional" | "load"; plan: Record<string, unknown>; enabled: boolean; nextRunAt: string | null; lastRunAt: string | null; lastRunId: string | null; lastRunStatus: RunStatus | null; lastError: string | null; rev: number; createdAt: string; updatedAt: string };
+export type ScheduleInput = { name: string; environment: string; cron: string; enabled?: boolean; kind: "functional" | "load"; plan: Record<string, unknown> };
+export type NotificationKind = "webhook" | "slack" | "email";
+export type NotificationTargetView = { id: string; name: string; kind: NotificationKind; notifyOn: "always" | "change"; enabled: boolean; urlHint: string | null; signed: boolean; recipients: string[] | null; lastSentAt: string | null; lastStatus: "ok" | "failed" | null; lastError: string | null; rev: number; createdAt: string; updatedAt: string };
+export type NotificationTargetInput = { name: string; kind: NotificationKind; notifyOn: "always" | "change"; enabled?: boolean; url?: string; signingSecret?: string | null; recipients?: string[] };
+
 export type SyncResult = { pulled: number; pushed: number; conflicts: number; rejected: { type: string; id: string; error: string }[]; skipped: number; durationMs: number };
 export type SyncStatus = {
   linked: boolean; url: string | null; workspace: { id: string; name: string } | null; deviceName: string;
@@ -109,6 +115,17 @@ export const API = {
   deleteRun: (runId: string) => api<null>("DELETE", `/v1/runs/${runId}`),
   cancelRun: (runId: string) => api<{ status: string }>("POST", `/v1/runs/${runId}/cancel`),
   probe: (id: string, input: { environment: string; operationId: string; scenarioId: string; parameters?: Record<string, string>; body?: unknown; samples?: number; locale: "es" | "en" }) => api<{ ok: boolean; durationMs: number; steps: CaseResult[] }>("POST", `${project(id)}/probe`, input),
+
+  schedules: (id: string) => api<ScheduleView[]>("GET", `${project(id)}/schedules`),
+  createSchedule: (id: string, input: ScheduleInput) => api<ScheduleView>("POST", `${project(id)}/schedules`, input),
+  updateSchedule: (id: string, schedule: string, changes: Partial<Omit<ScheduleInput, "kind">>) => api<ScheduleView>("PATCH", `${project(id)}/schedules/${schedule}`, changes),
+  deleteSchedule: (id: string, schedule: string) => api<null>("DELETE", `${project(id)}/schedules/${schedule}`),
+  runSchedule: (id: string, schedule: string) => api<{ id: string | null; error: string | null }>("POST", `${project(id)}/schedules/${schedule}/run`),
+  notifications: (id: string) => api<{ emailAvailable: boolean; targets: NotificationTargetView[] }>("GET", `${project(id)}/notifications`),
+  createNotification: (id: string, input: NotificationTargetInput) => api<NotificationTargetView>("POST", `${project(id)}/notifications`, input),
+  updateNotification: (id: string, target: string, changes: Partial<Omit<NotificationTargetInput, "kind">>) => api<NotificationTargetView>("PATCH", `${project(id)}/notifications/${target}`, changes),
+  deleteNotification: (id: string, target: string) => api<null>("DELETE", `${project(id)}/notifications/${target}`),
+  testNotification: (id: string, target: string, locale: "es" | "en") => api<{ ok: boolean; status: number | null; error: string | null }>("POST", `${project(id)}/notifications/${target}/test?locale=${locale}`),
 
   health: () => api<{ status: string; mode: "local" | "cloud"; auth: "none" | "required"; registration: "open" | "invite" }>("GET", "/health"),
   login: (email: string, password: string) => api<import("@/lib/session").Session>("POST", "/v1/auth/login", { email, password }),

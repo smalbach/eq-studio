@@ -33,9 +33,16 @@ export type NetworkConfig = {
    * proxy in front: e.g. `1` for one load balancer. */
   trustProxy?: string;
 };
+/** Outbound email for notifications. Absent: the email target is not offered. */
+export type SmtpConfig = { host: string; port: number; secure: boolean; user?: string; password?: string; from: string };
 export type AppConfig = { mode: "local" | "cloud"; host: string; port: number; database: DatabaseConfig; secrets: SecretKeySource; queue: QueueConfig; examplesDir?: string; webDir?: string; auth?: AuthConfig; network?: NetworkConfig;
   /** Local mode, once linked to a cloud workspace: seconds between automatic syncs (0: only on demand). */
-  sync?: { intervalSeconds: number } };
+  sync?: { intervalSeconds: number };
+  /** Seconds between the scheduler's checks for due schedules (0: schedules never fire here). Default 30. */
+  scheduler?: { tickSeconds: number };
+  smtp?: SmtpConfig;
+  /** Where the web app is reached, for the links in notifications. */
+  publicUrl?: string };
 
 /** The repository's `examples/` and the built web app, found relative to this file. */
 export const DEFAULT_EXAMPLES_DIR = fileURLToPath(new URL("../../../examples/", import.meta.url));
@@ -70,5 +77,10 @@ export function readConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     trustProxy: env.EQ_TRUST_PROXY,
   };
   const sync = { intervalSeconds: mode === "local" ? Math.max(0, Number(env.EQ_SYNC_INTERVAL_SECONDS ?? 300) || 0) : 0 };
-  return { sync, mode, port, host: env.EQ_HOST ?? (mode === "local" ? "127.0.0.1" : "0.0.0.0"), database, secrets, queue, examplesDir: env.EQ_EXAMPLES_DIR ?? DEFAULT_EXAMPLES_DIR, webDir: env.EQ_WEB_DIR ?? DEFAULT_WEB_DIR, auth, network };
+  const scheduler = { tickSeconds: Math.max(0, Number(env.EQ_SCHEDULER_TICK_SECONDS ?? 30) || 0) };
+  const smtpPort = Number(env.EQ_SMTP_PORT ?? 587);
+  const smtp: SmtpConfig | undefined = env.EQ_SMTP_HOST ? { host: env.EQ_SMTP_HOST, port: smtpPort, secure: env.EQ_SMTP_SECURE ? env.EQ_SMTP_SECURE === "true" : smtpPort === 465, user: env.EQ_SMTP_USER || undefined, password: env.EQ_SMTP_PASSWORD || undefined, from: env.EQ_SMTP_FROM ?? `Endpoint Quality <noreply@${env.EQ_SMTP_HOST}>` } : undefined;
+  const host = env.EQ_HOST ?? (mode === "local" ? "127.0.0.1" : "0.0.0.0");
+  const publicUrl = env.EQ_PUBLIC_URL?.replace(/\/+$/, "") ?? (mode === "local" ? `http://localhost:${port}` : undefined);
+  return { sync, scheduler, smtp, publicUrl, mode, port, host, database, secrets, queue, examplesDir: env.EQ_EXAMPLES_DIR ?? DEFAULT_EXAMPLES_DIR, webDir: env.EQ_WEB_DIR ?? DEFAULT_WEB_DIR, auth, network };
 }

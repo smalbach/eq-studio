@@ -19,6 +19,8 @@ import { CredentialsModule } from "./modules/credentials/credentials.module.ts";
 import { RunsModule } from "./modules/runs/runs.module.ts";
 import { AccountsModule } from "./modules/accounts/accounts.module.ts";
 import { SyncModule } from "./modules/sync/sync.module.ts";
+import { SchedulesModule } from "./modules/schedules/schedules.module.ts";
+import { NotificationsModule } from "./modules/notifications/notifications.module.ts";
 import { AuthGuard } from "./shared/auth.guard.ts";
 import { APP_GUARD } from "@nestjs/core";
 import { ProblemDetailsFilter } from "./shared/problem.filter.ts";
@@ -36,7 +38,7 @@ class ConfigHolder {
  * HTTP fetcher (a test can serve documents without a network). */
 export async function createApp(config: AppConfig, overrides: { specFetcher?: SpecFetcher } = {}) {
   @Module({
-    imports: [ConfigHolder.of(config), CqrsModule.forRoot(), DatabaseModule, PersistenceModule, ProjectsModule, SpecsModule, EnvironmentsModule, ProjectConfigModule, CredentialsModule, RunsModule, AccountsModule, SyncModule.forMode(config.mode)],
+    imports: [ConfigHolder.of(config), CqrsModule.forRoot(), DatabaseModule, PersistenceModule, ProjectsModule, SpecsModule, EnvironmentsModule, ProjectConfigModule, CredentialsModule, RunsModule, AccountsModule, SchedulesModule, NotificationsModule, SyncModule.forMode(config.mode)],
     controllers: [HealthController, ExamplesController],
     providers: [{ provide: APP_GUARD, useClass: AuthGuard }],
   })

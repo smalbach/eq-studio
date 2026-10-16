@@ -73,6 +73,28 @@ propio contenedor). Úsalo en local ([Inicio rápido](doc:inicio)). Para probarl
 el mock en una máquina que el servidor alcance, cambia la URL base del entorno y, solo si esa
 dirección es privada y el despliegue vive en una red privada, activa `EQ_ALLOW_PRIVATE_TARGETS=true`.
 
+## Notificaciones por email (SMTP)
+
+Las notificaciones por webhook y Slack no necesitan nada en el servidor. El email sí: sin `EQ_SMTP_HOST` el panel no lo ofrece.
+
+| Variable | Por defecto | Qué hace |
+| --- | --- | --- |
+| `EQ_SMTP_HOST` | — | El servidor SMTP. Activa las notificaciones por email. |
+| `EQ_SMTP_PORT` | `587` | Puerto: `587` con STARTTLS, `465` con TLS desde el inicio. |
+| `EQ_SMTP_SECURE` | `true` en el puerto 465 | `true`: TLS desde el primer byte. `false`: en claro, y se sube a STARTTLS si el servidor lo ofrece. |
+| `EQ_SMTP_USER` · `EQ_SMTP_PASSWORD` | — | Credenciales (AUTH PLAIN). Solo se envían por una conexión cifrada. |
+| `EQ_SMTP_FROM` | `Endpoint Quality <noreply@<host>>` | El remitente. |
+| `EQ_PUBLIC_URL` | — | La dirección pública del despliegue (`https://eq.example.com`), para que cada notificación enlace a su corrida. |
+
+```bash
+EQ_SMTP_HOST=smtp.example.com EQ_SMTP_PORT=587 \
+EQ_SMTP_USER=eq@example.com EQ_SMTP_PASSWORD=… \
+EQ_SMTP_FROM="Endpoint Quality <eq@example.com>" \
+EQ_PUBLIC_URL=https://eq.example.com
+```
+
+Las programaciones se disparan desde los propios procesos del API, cada `EQ_SCHEDULER_TICK_SECONDS` (30); con varios procesos, cada ocurrencia se lanza igual una sola vez. Ver [Programaciones y notificaciones](doc:automatizacion).
+
 ## Seguridad
 
 - **Credenciales** cifradas con AES-256-GCM; el API solo devuelve sus 4 últimos caracteres.

@@ -73,6 +73,28 @@ itself). Use it locally ([Quick start](doc:inicio)). To try it in the cloud, sta
 machine the server reaches, change the environment's base URL and, only if that address is private
 and the deployment lives in a private network, set `EQ_ALLOW_PRIVATE_TARGETS=true`.
 
+## Email notifications (SMTP)
+
+Webhook and Slack notifications need nothing on the server. Email does: without `EQ_SMTP_HOST` the panel does not offer it.
+
+| Variable | Default | What it does |
+| --- | --- | --- |
+| `EQ_SMTP_HOST` | — | The SMTP server. Turns email notifications on. |
+| `EQ_SMTP_PORT` | `587` | Port: `587` with STARTTLS, `465` with TLS from the start. |
+| `EQ_SMTP_SECURE` | `true` on port 465 | `true`: TLS from the first byte. `false`: plain, upgraded with STARTTLS if the server offers it. |
+| `EQ_SMTP_USER` · `EQ_SMTP_PASSWORD` | — | Credentials (AUTH PLAIN). They are only ever sent over an encrypted connection. |
+| `EQ_SMTP_FROM` | `Endpoint Quality <noreply@<host>>` | The sender. |
+| `EQ_PUBLIC_URL` | — | The deployment's public address (`https://eq.example.com`), so every notification links to its run. |
+
+```bash
+EQ_SMTP_HOST=smtp.example.com EQ_SMTP_PORT=587 \
+EQ_SMTP_USER=eq@example.com EQ_SMTP_PASSWORD=… \
+EQ_SMTP_FROM="Endpoint Quality <eq@example.com>" \
+EQ_PUBLIC_URL=https://eq.example.com
+```
+
+Schedules fire from the API processes themselves, every `EQ_SCHEDULER_TICK_SECONDS` (30); with several processes each occurrence still starts once. See [Schedules and notifications](doc:automatizacion).
+
 ## Security
 
 - **Credentials** encrypted with AES-256-GCM; the API only returns their last 4 characters.

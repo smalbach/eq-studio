@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { Button, Popover, Separator, Spinner, Text } from "@radix-ui/themes";
-import { Activity, BookOpen, ChevronDown, FolderOpen, Folders, Gauge, Globe2, LayoutDashboard, Settings, ShieldCheck } from "lucide-react";
+import { Activity, BookOpen, CalendarClock, ChevronDown, FolderOpen, Folders, Gauge, Globe2, LayoutDashboard, Settings, ShieldCheck } from "lucide-react";
 import { useSession } from "@/lib/session";
+import { AutomationPanel } from "@/components/automation/automation-panel";
 import { EnvironmentPanel } from "@/components/environment/environment-panel";
 import type { Environment } from "@/components/environment/use-environment";
 import { ProjectPanel } from "@/components/projects/project-panel";
@@ -19,8 +20,8 @@ type NavItem = { id: Exclude<Section, "guide">; icon: typeof Activity };
 const NAV: NavItem[][] = [[{ id: "home", icon: Folders }], [{ id: "dashboard", icon: LayoutDashboard }, { id: "functional", icon: ShieldCheck }, { id: "load", icon: Gauge }], [{ id: "learn", icon: BookOpen }, { id: "settings", icon: Settings }]];
 
 const MESSAGES = defineMessages({
-  es: { home: "Proyectos", dashboard: "Panel", functional: "Verificación funcional", load: "Carga y estrés", learn: "Documentación", settings: "Ajustes", subtitle: "Calidad de APIs contra su contrato", sections: "Secciones", running: "en curso", environment: "Entorno", environmentTitle: "Entorno y lo que permite", project: "Proyecto", projectTitle: "El proyecto abierto y sus acciones" },
-  en: { home: "Projects", dashboard: "Dashboard", functional: "Functional verification", load: "Load and stress", learn: "Documentation", settings: "Settings", subtitle: "API quality against its contract", sections: "Sections", running: "running", environment: "Environment", environmentTitle: "Environment and what it allows", project: "Project", projectTitle: "The open project and its actions" },
+  es: { home: "Proyectos", dashboard: "Panel", functional: "Verificación funcional", load: "Carga y estrés", learn: "Documentación", settings: "Ajustes", subtitle: "Calidad de APIs contra su contrato", sections: "Secciones", running: "en curso", environment: "Entorno", environmentTitle: "Entorno y lo que permite", project: "Proyecto", projectTitle: "El proyecto abierto y sus acciones", automation: "Automatización", automationTitle: "Programaciones y notificaciones del proyecto", automationDetail: "Programar y avisar" },
+  en: { home: "Projects", dashboard: "Dashboard", functional: "Functional verification", load: "Load and stress", learn: "Documentation", settings: "Settings", subtitle: "API quality against its contract", sections: "Sections", running: "running", environment: "Environment", environmentTitle: "Environment and what it allows", project: "Project", projectTitle: "The open project and its actions", automation: "Automation", automationTitle: "The project's schedules and notifications", automationDetail: "Schedule and notify" },
 });
 
 /** A header button that opens a settings panel in a popover below it. */
@@ -61,6 +62,14 @@ function EnvironmentMenu({ env, busy }: { env: Environment; busy: boolean }) {
   </HeaderMenu>;
 }
 
+/** The header's automation button: the project's schedules and notification targets below it. */
+function AutomationMenu({ env }: { env: Environment }) {
+  const t = useMessages(MESSAGES);
+  return <HeaderMenu icon={CalendarClock} caption={t.automation} title={t.automationDetail} detail={env.label} label={t.automationTitle}>
+    {(close) => <AutomationPanel env={env} onClose={close}/>}
+  </HeaderMenu>;
+}
+
 /** Logo, the sections (with a spinner where something is running), the open project and its environment. */
 export function AppHeader({ section, onSection, onGuide, workspace, env, functionalBusy, loadRunning }: { section: Section; onSection: (section: Section) => void; onGuide: () => void; workspace: Workspace; env: Environment; functionalBusy: boolean; loadRunning: boolean }) {
   const busyIn: Partial<Record<Section, boolean>> = { functional: functionalBusy, load: loadRunning };
@@ -81,6 +90,7 @@ export function AppHeader({ section, onSection, onGuide, workspace, env, functio
       <AppearanceMenu/>
       {workspace.activeId && <ProjectMenu workspace={workspace} busy={functionalBusy || loadRunning} onGuide={onGuide} onSwitch={() => onSection("home")}/>}
       {workspace.activeId && <EnvironmentMenu env={env} busy={functionalBusy || loadRunning}/>}
+      {workspace.activeId && <AutomationMenu env={env}/>}
     </div>
   </header>;
 }
