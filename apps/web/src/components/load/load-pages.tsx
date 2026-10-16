@@ -17,7 +17,7 @@ import { LoadSettings } from "@/components/load/load-settings";
 import { exportLoadReport, testTypeLabel, type LoadRunner } from "@/components/load/use-load-runner";
 import { LOAD_LIMITS } from "@/lib/load.mjs";
 import { reportBudget, type LoadRun } from "@/lib/load-types";
-import { formatDate } from "@/lib/format";
+import { fileStamp, formatDate } from "@/lib/format";
 import { defineMessages, useLocale, useMessages } from "@/lib/i18n";
 
 const MESSAGES = defineMessages({
@@ -87,7 +87,7 @@ function LoadRunDetail({ run, history, onDelete }: { run: LoadRun; history: Load
       </div>
       <p className="mt-2 text-[10px] text-slate-400">{t.p95Change}<Delta value={run.p95} previous={previous.p95} unit=" ms"/>{t.throughputChange}<Delta value={run.rps} previous={previous.rps} unit=" req/s" lowerIsBetter={false}/></p>
     </Card>}
-    <LoadReportView report={run.report} type={run.type} budget={reportBudget(run.report)} title={testTypeLabel(run.type, locale)} subtitle={formatDate(run.at, locale)} onExport={() => exportLoadReport(run, run.report!)}/>
+    <LoadReportView report={run.report} type={run.type} budget={reportBudget(run.report)} title={testTypeLabel(run.type, locale)} subtitle={formatDate(run.at, locale)} onExport={() => exportLoadReport(run, run.report!)} runId={run.id} reportName={`eq-load-${fileStamp(run.at)}`}/>
   </div>;
 }
 
@@ -154,7 +154,7 @@ export function NewLoadPage({ load, crumbs, shared, tokenMinutesLeft, onOpenRun 
         </div>
       </Card>
       <LoadLive load={load}/>
-      {lastRun?.report && <LoadReportView report={lastRun.report} type={lastRun.type} budget={reportBudget(lastRun.report)} title={t.lastTest} subtitle={`${testTypeLabel(lastRun.type, locale)} · ${lastRun.environment}`} onExport={() => exportLoadReport(lastRun, lastRun.report!)}/>}
+      {lastRun?.report && <LoadReportView report={lastRun.report} type={lastRun.type} budget={reportBudget(lastRun.report)} title={t.lastTest} subtitle={`${testTypeLabel(lastRun.type, locale)} · ${lastRun.environment}`} onExport={() => exportLoadReport(lastRun, lastRun.report!)} runId={lastRun.id} reportName={`eq-load-${fileStamp(lastRun.at)}`}/>}
     </div>
   </>;
 }

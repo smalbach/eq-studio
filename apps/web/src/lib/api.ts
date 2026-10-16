@@ -25,11 +25,7 @@ export class ApiError extends Error {
  * repeated, so a person is only sent back to the sign-in screen when the session is really over.
  */
 export async function api<T>(method: string, path: string, body?: unknown, retried = false): Promise<T> {
-  const headers: Record<string, string> = { Accept: "application/json", ...(body === undefined ? {} : { "Content-Type": "application/json" }) };
-  const token = accessToken();
-  const workspace = currentWorkspace();
-  if (token) headers.Authorization = `Bearer ${token}`;
-  if (workspace) headers["X-Workspace"] = workspace;
+  const headers = authHeaders({ Accept: "application/json", ...(body === undefined ? {} : { "Content-Type": "application/json" }) });
   let response: Response;
   try {
     response = await fetch(path, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
@@ -44,6 +40,31 @@ export async function api<T>(method: string, path: string, body?: unknown, retri
     throw new ApiError(response.status, payload?.title ?? response.statusText, payload?.detail ?? `HTTP ${response.status}`, payload?.errors ?? []);
   }
   return payload as T;
+}
+
+/** The session's access token and workspace, on top of `headers`. */
+function authHeaders(headers: Record<string, string>) {
+  const token = accessToken();
+  const workspace = currentWorkspace();
+  return { ...headers, ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(workspace ? { "X-Workspace": workspace } : {}) };
+}
+
+/** A GET whose answer is a file, not JSON (a report): its text and media type. */
+export async function apiFile(path: string, retried = false): Promise<{ text: string; type: string }> {
+  let response: Response;
+  try {
+    response = await fetch(path, { headers: authHeaders({ Accept: "*/*" }) });
+  } catch {
+    throw new ApiError(0, "Unreachable", "The Endpoint Quality API is not reachable. Is it running? (pnpm run dev, or pnpm start)");
+  }
+  if (response.status === 401 && !retried && getSession().status === "signed-in" && await refreshSession()) return apiFile(path, true);
+  const text = await response.text();
+  if (!response.ok) {
+    let payload: { title?: string; detail?: string } | null = null;
+    try { payload = JSON.parse(text); } catch { /* not Problem Details */ }
+    throw new ApiError(response.status, payload?.title ?? response.statusText, payload?.detail ?? `HTTP ${response.status}`);
+  }
+  return { text, type: response.headers.get("content-type") ?? "application/octet-stream" };
 }
 
 export type ProjectSummary = { id: string; slug: string; name: string; rev: number; activeSpecVersionId: string | null; contractVersion: string | null; operationCount: number; updatedAt: string };
@@ -106,6 +127,8 @@ export const API = {
   startLoadRun: (id: string, plan: Record<string, unknown>) => api<{ id: string }>("POST", `${project(id)}/load-runs`, plan),
   runs: (id: string, kind: "functional" | "load", limit = 25) => api<ApiRun[]>("GET", `${project(id)}/runs?kind=${kind}&limit=${limit}&full=true`),
   run: (runId: string) => api<ApiRun>("GET", `/v1/runs/${runId}?steps=true`),
+  /** A run as a shareable file (`html`, `sarif` or `junit`), secrets masked by the API. */
+  runReport: (runId: string, format: "html" | "sarif" | "junit", locale: "es" | "en") => apiFile(`/v1/runs/${runId}/report?format=${format}&locale=${locale}`),
   deleteRun: (runId: string) => api<null>("DELETE", `/v1/runs/${runId}`),
   cancelRun: (runId: string) => api<{ status: string }>("POST", `/v1/runs/${runId}/cancel`),
   probe: (id: string, input: { environment: string; operationId: string; scenarioId: string; parameters?: Record<string, string>; body?: unknown; samples?: number; locale: "es" | "en" }) => api<{ ok: boolean; durationMs: number; steps: CaseResult[] }>("POST", `${project(id)}/probe`, input),

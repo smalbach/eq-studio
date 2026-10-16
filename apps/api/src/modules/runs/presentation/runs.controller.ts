@@ -1,4 +1,5 @@
-import { Body, Controller, Delete, Get, HttpCode, Inject, Param, Post, Query, Sse, type MessageEvent } from "@nestjs/common";
+import { Body, Controller, Delete, Get, HttpCode, Inject, Param, Post, Query, Res, Sse, type MessageEvent } from "@nestjs/common";
+import { REPORT_FORMATS } from "@eq/runner-core/report";
 import { CommandBus, QueryBus } from "@nestjs/cqrs";
 import { ORDER_MODES } from "@eq/runner-core";
 import { Observable } from "rxjs";
@@ -10,7 +11,10 @@ import { CancelRunCommand, DeleteRunCommand, ReplayRunCommand } from "../applica
 import { ProbeCommand } from "../application/commands/probe.ts";
 import { StartLoadRunCommand, StartRunCommand } from "../application/commands/start-run.ts";
 import { GetRunQuery, ListRunsQuery } from "../application/queries/run-queries.ts";
+import { RunReportQuery } from "../application/queries/run-report.ts";
 import { RunStream } from "../application/run-stream.ts";
+
+type Response = { setHeader(name: string, value: string): void };
 
 const locale = z.enum(["es", "en"]).default("es");
 const functionalRun = z.object({
@@ -42,6 +46,7 @@ const loadRun = z.object({
   locale,
 });
 const probe = z.object({ environment: z.string().min(1), operationId: z.string().min(1), scenarioId: z.string().min(1), parameters: z.record(z.string(), z.string()).optional(), body: z.unknown().optional(), samples: z.number().int().min(1).max(50).default(1), locale });
+const reportQuery = z.object({ format: z.enum(REPORT_FORMATS).default("html"), locale: z.enum(["es", "en"]).default("en"), download: z.enum(["true", "false"]).default("true") });
 const listQuery = z.object({ kind: z.enum(["functional", "load"]).optional(), limit: z.coerce.number().int().optional(), full: z.enum(["true", "false"]).optional() });
 
 /** Who started a run, as the history shows it. */
@@ -85,6 +90,20 @@ export class RunsController {
   @Get("runs/:run")
   get(@Workspace() workspaceId: string, @Param("run") run: string, @Query("steps") steps?: string) {
     return this.queries.execute(new GetRunQuery(workspaceId, run, steps === "true"));
+  }
+
+  /** The run as a shareable file: `html` (self-contained page), `sarif` (code scanning) or
+   * `junit`. Secrets are masked; `download=false` shows it inline instead of saving it. */
+  @Get("runs/:run/report")
+  async report(@Workspace() workspaceId: string, @Param("run") run: string, @Query() query: unknown, @Res({ passthrough: true }) response: Response) {
+    const { format, locale, download } = parse(reportQuery, query);
+    const report = await this.queries.execute<RunReportQuery, { body: string; contentType: string; filename: string }>(new RunReportQuery(workspaceId, run, format, locale));
+    response.setHeader("Content-Type", report.contentType);
+    response.setHeader("Content-Disposition", `${download === "true" ? "attachment" : "inline"}; filename="${report.filename.replace(/[^\w.-]/g, "_")}"`);
+    response.setHeader("X-Content-Type-Options", "nosniff");
+    // The page carries its own CSP (no requests at all); this one applies when it is served.
+    if (format === "html") response.setHeader("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src data:");
+    return report.body;
   }
 
   @Requires("admin")

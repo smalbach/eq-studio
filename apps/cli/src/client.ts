@@ -15,15 +15,17 @@ export type Client = ReturnType<typeof client>;
 export function client(base: string, auth: { token?: string; workspace?: string } = {}) {
   const root = base.replace(/\/+$/, "");
   const authHeaders: Record<string, string> = { ...(auth.token ? { Authorization: `Bearer ${auth.token}` } : {}), ...(auth.workspace ? { "X-Workspace": auth.workspace } : {}) };
-  async function call<T>(method: string, path: string, body?: unknown): Promise<T> {
+  async function call<T>(method: string, path: string, body?: unknown, raw = false): Promise<T> {
     let response: Response;
     try {
-      response = await fetch(`${root}${path}`, { method, headers: { Accept: "application/json", ...(body === undefined ? {} : { "Content-Type": "application/json" }), ...authHeaders }, body: body === undefined ? undefined : JSON.stringify(body) });
+      response = await fetch(`${root}${path}`, { method, headers: { Accept: raw ? "*/*" : "application/json", ...(body === undefined ? {} : { "Content-Type": "application/json" }), ...authHeaders }, body: body === undefined ? undefined : JSON.stringify(body) });
     } catch {
       throw new CliError(`The Endpoint Quality API at ${root} is not reachable. Start it with "eq serve", or pass --file to run without a server.`, EXIT.error);
     }
     const text = await response.text();
-    const payload = text ? JSON.parse(text) : null;
+    if (raw && response.ok) return text as T;
+    let payload = null;
+    try { payload = text ? JSON.parse(text) : null; } catch { if (!raw) throw new CliError(`Unexpected answer from ${root}${path}`, EXIT.error); }
     if (response.status === 401) throw new CliError(`${payload?.detail ?? "Unauthorized"}. Pass an API token with --api-token or EQ_API_TOKEN (create one in Settings → API tokens).`, EXIT.usage);
     if (response.status === 403) throw new CliError(`${payload?.detail ?? "Forbidden"}`, EXIT.usage);
     if (!response.ok) throw new CliError([payload?.detail ?? `HTTP ${response.status}`, ...(payload?.errors ?? [])].join("\n  "), response.status === 422 || response.status === 404 ? EXIT.usage : EXIT.error);
@@ -32,6 +34,8 @@ export function client(base: string, auth: { token?: string; workspace?: string 
   return {
     base: root,
     get: <T>(path: string) => call<T>("GET", path),
+    /** A response that is not JSON (a report), as text. */
+    text: (path: string) => call<string>("GET", path, undefined, true),
     post: <T>(path: string, body?: unknown) => call<T>("POST", path, body),
     put: <T>(path: string, body?: unknown) => call<T>("PUT", path, body),
     patch: <T>(path: string, body?: unknown) => call<T>("PATCH", path, body),

@@ -68,6 +68,34 @@ test("failing cases exit 1 and name what failed", async () => {
   assert.ok(run.cases.some((item: { status: string; steps: { assertions: { label: string; pass: boolean }[] }[] }) => item.status === "failed" && item.steps.some((step) => step.assertions.some((assertion) => assertion.label === "Schema OpenAPI" && !assertion.pass))));
 });
 
+test("--html and --sarif with --junit; eq report renders a stored run again, with no secret", async () => {
+  const [html, sarif, junit, run] = ["report.html", "report.sarif", "both.xml", "run.json"].map((name) => join(work, name));
+  const result = await eq(["run", "--file", example, "--env", "local-auth", "--base-url", authUrl, "--read-only", "--auth", "--read-token", "read-token", "--html", html, "--sarif", sarif, "--junit", junit, "--json", run, "--quiet"], { EQ_TOKEN: "admin-token" });
+  assert.equal(result.code, 0, result.stderr);
+  const page = readFileSync(html, "utf8");
+  assert.match(page, /^<!doctype html>/);
+  assert.match(page, /mock-store · GET matrix <span class="verdict v-passed">PASSED<\/span>/);
+  assert.match(page, /<dt>Contract version<\/dt>/);
+  const log = JSON.parse(readFileSync(sarif, "utf8"));
+  assert.equal(log.version, "2.1.0");
+  assert.deepEqual(log.runs[0].results, []);
+  assert.match(readFileSync(junit, "utf8"), /<testsuites name="mock-store · Local \(auth\)/);
+  for (const file of [html, sarif, junit]) assert.equal(readFileSync(file, "utf8").includes("admin-token"), false, file);
+
+  const failing = await eq(["run", "--file", example, "--env", "local", "--base-url", brokenUrl, "--read-only", "--sarif", sarif, "--json", run, "--quiet"]);
+  assert.equal(failing.code, 1);
+  const results = JSON.parse(readFileSync(sarif, "utf8")).runs[0].results;
+  assert.ok(results.length > 0);
+  assert.ok(results.every((item: { locations: { physicalLocation: { artifactLocation: { uri: string }; region?: { startLine: number } } }[] }) => item.locations[0].physicalLocation.artifactLocation.uri.endsWith("examples/mock-store/mock-store.eq.json") && item.locations[0].physicalLocation.region!.startLine > 0), "results point at the project file");
+
+  const again = await eq(["report", run, "--format", "html", "--locale", "es"]);
+  assert.equal(again.code, 0, again.stderr);
+  assert.match(again.stdout, /<html lang="es">/);
+  assert.match(again.stdout, /mock-store · GET matrix <span class="verdict v-failed">FALLIDA<\/span>/);
+  assert.equal((await eq(["report", run, "--format", "pdf"])).code, 2);
+  assert.equal((await eq(["report", join(work, "nope.json"), "--api", "http://127.0.0.1:9"])).code, 3, "not a file: a run id, on an API that is not there");
+});
+
 test("credentials come from flags or the environment, and drive the 401/403 cases", async () => {
   const result = await eq(["run", "--file", example, "--env", "local-auth", "--base-url", authUrl, "--auth", "--read-token", "read-token", "--api-key", "demo-key"], { EQ_TOKEN: "admin-token" });
   assert.equal(result.code, 0, result.stdout + result.stderr);
@@ -96,6 +124,17 @@ test("against a running API: import, list, run and export", async () => {
   const output = join(work, "exported.eq.json");
   assert.equal((await eq(["export", "mock-store", "-o", output, ...api])).code, 0);
   assert.equal(JSON.parse(readFileSync(output, "utf8")).project.name, "Mock Store");
+});
+
+test("eq report <run id> asks the API that holds the run (the project imported above)", async () => {
+  const api = ["--api", server.url];
+  const ran = await eq(["run", "mock-store", "--env", "local", "--base-url", mockUrl, "--read-only", "--quiet", "--json", join(work, "remote.json"), ...api]);
+  assert.equal(ran.code, 0, ran.stderr);
+  const { id } = JSON.parse(readFileSync(join(work, "remote.json"), "utf8"));
+  const output = join(work, "remote.sarif");
+  const result = await eq(["report", id, "--format", "sarif", "-o", output, ...api]);
+  assert.equal(result.code, 0, result.stderr);
+  assert.equal(JSON.parse(readFileSync(output, "utf8")).runs[0].properties.runId, id);
 });
 
 test("a short load test passes and prints its verdict", async () => {

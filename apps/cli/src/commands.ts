@@ -2,10 +2,11 @@
  * The commands. Each one returns the process exit code: 0 everything passed, 1 something failed,
  * 2 the command was wrong (a flag, a project, an environment), 3 it could not run at all.
  */
-import { readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { spawn } from "node:child_process";
+import { relative, resolve, sep } from "node:path";
 import { CliError, client, EXIT, waitForRun, type Client, type Run } from "./client.ts";
-import { bold, dim, green, junitReport, red, textReport } from "./report.ts";
+import { bold, dim, green, red, renderReport, REPORT_FORMATS, textReport, type ReportContext, type ReportFormat } from "./report.ts";
 import { startServer, type Server } from "./server.ts";
 import { DATA_DIR, VERSION } from "./runtime.ts";
 
@@ -89,15 +90,47 @@ function progress(run: Run) {
   process.stderr.write(`\r\u001b[2K${dim(line)}`);
 }
 
-function outputs(run: Run, project: string, environmentName: string, flags: Flags) {
-  const junit = str(flags, "junit");
-  if (junit) writeFileSync(junit, junitReport(run, project, environmentName));
+/** The tokens this run was given: masked wherever they would appear in a report. */
+const secretsOf = (flags: Flags) => [str(flags, "token") ?? process.env.EQ_TOKEN, str(flags, "read-token") ?? process.env.EQ_READ_TOKEN, str(flags, "api-key") ?? process.env.EQ_API_KEY, str(flags, "api-token") ?? process.env.EQ_API_TOKEN].filter((value): value is string => Boolean(value));
+
+/**
+ * The contract file SARIF points its results at: `--contract`, or the project file of `--file`.
+ * Its path relative to the working directory — the repository root in CI — is what code scanning
+ * resolves against the checkout.
+ */
+function contractOf(flags: Flags): ReportContext["contract"] {
+  const file = str(flags, "contract") ?? str(flags, "file");
+  if (!file || !existsSync(file)) return undefined;
+  const path = relative(process.cwd(), resolve(file)).split(sep).join("/");
+  let text: string | undefined;
+  try { text = readFileSync(file, "utf8"); } catch { text = undefined; }
+  return { uri: path, text };
+}
+
+/** Where the run happened, for the reports, and with the masks they need. */
+function reportContext(project: string, contractVersion: string | null | undefined, env: { name: string; baseUrl?: string }, flags: Flags): ReportContext {
+  return { project, environment: env.name, baseUrl: env.baseUrl, contractVersion, contract: contractOf(flags), secrets: secretsOf(flags), locale: str(flags, "locale") === "es" ? "es" : "en", toolVersion: VERSION };
+}
+
+/** `--junit`, `--html` and `--sarif`, each to its file. */
+function writeReports(run: Run, context: ReportContext, flags: Flags) {
+  for (const format of REPORT_FORMATS) {
+    const file = str(flags, format);
+    if (file) writeFileSync(file, renderReport(format, run, context).body);
+  }
+}
+
+function outputs(run: Run, context: ReportContext, flags: Flags) {
+  writeReports(run, context, flags);
   const json = str(flags, "json");
-  if (json) writeFileSync(json, `${JSON.stringify(run, null, 2)}\n`);
+  // The run and where it ran: what `eq report run.json` needs to render it again later.
+  const { secrets: _secrets, contract: _contract, ...where } = context;
+  void _secrets; void _contract;
+  if (json) writeFileSync(json, `${JSON.stringify({ ...run, context: where }, null, 2)}\n`);
   if (process.stderr.isTTY) process.stderr.write("\r\u001b[2K");
   if (flags.quiet) return;
   if (str(flags, "format") === "json") process.stdout.write(`${JSON.stringify(run, null, 2)}\n`);
-  else process.stdout.write(`${textReport(run, environmentName)}\n`);
+  else process.stdout.write(`${textReport(run, context.environment)}\n`);
 }
 
 function exitCodeOf(run: Run, flags: Flags) {
@@ -120,8 +153,8 @@ export async function run(projectArgument: string | undefined, flags: Flags) {
     });
     log(dim(`Running ${started.total} cases against ${env.name} (${env.baseUrl})…`));
     const finished = await waitForRun(api, started.id, progress);
-    const { slug } = await api.get<{ slug: string }>(`/v1/projects/${project}`);
-    outputs(finished, slug, env.name, flags);
+    const { slug, contractVersion } = await api.get<{ slug: string; contractVersion: string | null }>(`/v1/projects/${project}`);
+    outputs(finished, reportContext(slug, contractVersion, env, flags), flags);
     return exitCodeOf(finished, flags);
   } finally {
     await server?.close();
@@ -144,7 +177,8 @@ export async function load(projectArgument: string | undefined, flags: Flags) {
     });
     log(dim(`${type} test against ${env.name} (${env.baseUrl})…`));
     const finished = await waitForRun(api, started.id, progress, 1000);
-    outputs(finished, project, env.name, flags);
+    const { slug, contractVersion } = await api.get<{ slug: string; contractVersion: string | null }>(`/v1/projects/${project}`);
+    outputs(finished, reportContext(slug, contractVersion, env, flags), flags);
     return exitCodeOf(finished, flags);
   } finally {
     await server?.close();
@@ -196,5 +230,31 @@ export async function importProject(path: string | undefined, flags: Flags) {
   try { file = JSON.parse(readFileSync(path, "utf8")); } catch (error) { throw new CliError(`Cannot read ${path}: ${error instanceof Error ? error.message : String(error)}`, EXIT.usage); }
   const created = await api.post<{ slug: string }>("/v1/projects/import", { file });
   log(`${green("✓")} imported as ${bold(created.slug)}`);
+  return EXIT.ok;
+}
+
+/**
+ * A stored run as a report: a run id is rendered by the API that holds it (`--api`), a file
+ * written by `--json` is rendered here, without any server.
+ */
+export async function report(source: string | undefined, flags: Flags) {
+  if (!source) throw new CliError("Give a run id, or a run file written by --json", EXIT.usage);
+  const format = (str(flags, "format") ?? "html") as ReportFormat;
+  if (!REPORT_FORMATS.includes(format)) throw new CliError(`--format is ${REPORT_FORMATS.join(", ")}`, EXIT.usage);
+  const locale = str(flags, "locale") === "es" ? "es" : "en";
+  let body: string;
+  if (existsSync(source)) {
+    let stored: Run & { context?: Partial<ReportContext> };
+    try { stored = JSON.parse(readFileSync(source, "utf8")); } catch (error) { throw new CliError(`Cannot read ${source}: ${error instanceof Error ? error.message : String(error)}`, EXIT.usage); }
+    if (!stored || typeof stored !== "object" || !stored.id || !stored.kind || !stored.totals) throw new CliError(`${source} is not a run written by --json`, EXIT.usage);
+    const { context, ...run } = stored;
+    const project = str(flags, "project") ?? context?.project ?? "project";
+    const env = { name: str(flags, "env") ?? context?.environment ?? "—", baseUrl: context?.baseUrl };
+    body = renderReport(format, run, { ...reportContext(project, context?.contractVersion, env, flags), locale: str(flags, "locale") ? locale : context?.locale ?? locale }).body;
+  } else {
+    body = await remote(flags).text(`/v1/runs/${encodeURIComponent(source)}/report?format=${format}&locale=${locale}`);
+  }
+  const output = str(flags, "output");
+  if (output) { writeFileSync(output, body); log(`${green("✓")} ${output}`); } else process.stdout.write(body);
   return EXIT.ok;
 }

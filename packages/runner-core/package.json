@@ -7,7 +7,8 @@
   "exports": {
     ".": "./src/index.ts",
     "./load": "./src/load.mjs",
-    "./load-degradation": "./src/load-degradation.mjs"
+    "./load-degradation": "./src/load-degradation.mjs",
+    "./report": "./src/report/index.ts"
   },
   "scripts": {
     "test": "node --test test/*.test.ts"

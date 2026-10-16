@@ -1,6 +1,6 @@
 /**
- * A finished run as a person reads it in a terminal, as JSON for a script, and as JUnit XML for
- * CI systems that show test results (GitHub, GitLab, Jenkins, Azure DevOps all read it).
+ * A finished run as a person reads it in a terminal. JSON is the run itself; JUnit XML, HTML and
+ * SARIF come from `@eq/runner-core/report`.
  */
 import type { Run, RunCase } from "./client.ts";
 
@@ -35,38 +35,5 @@ export function textReport(run: Run, environment: string): string {
   return lines.join("\n");
 }
 
-const xml = (value: unknown) => String(value ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-
-/** A load test: one `<testcase>` per criterion of its verdict. */
-function loadJunit(run: Run, project: string, environment: string): string {
-  const checks = (run.report as { verdict?: { checks: { label: string; pass: boolean; detail: string }[] } } | null)?.verdict?.checks ?? [];
-  const failures = checks.filter((check) => !check.pass).length;
-  const cases = checks.map((check) => {
-    const head = `    <testcase classname="${xml(`${project}.load`)}" name="${xml(check.label)}"`;
-    return check.pass ? `${head}/>` : `${head}>\n      <failure message="${xml(check.detail)}">${xml(check.detail)}</failure>\n    </testcase>`;
-  });
-  if (run.error) cases.push(`    <testcase classname="${xml(`${project}.load`)}" name="run">\n      <error message="${xml(run.error)}"/>\n    </testcase>`);
-  const time = ((run.durationMs ?? 0) / 1000).toFixed(3);
-  return `<?xml version="1.0" encoding="UTF-8"?>\n<testsuites name="${xml(`${project} · ${environment} · ${run.scope}`)}" tests="${cases.length}" failures="${failures}" time="${time}">\n  <testsuite name="${xml(run.scope)}" tests="${cases.length}" failures="${failures}" time="${time}">\n${cases.join("\n")}\n  </testsuite>\n</testsuites>\n`;
-}
-
-/** One `<testsuite>` per operation, one `<testcase>` per case. Blocked cases are `<skipped>`. */
-export function junitReport(run: Run, project: string, environment: string): string {
-  if (run.kind === "load") return loadJunit(run, project, environment);
-  const byOperation = new Map<string, RunCase[]>();
-  for (const item of run.cases ?? []) byOperation.set(item.operationId, [...(byOperation.get(item.operationId) ?? []), item]);
-  const suites = [...byOperation.entries()].map(([operation, cases]) => {
-    const failures = cases.filter((item) => item.status === "failed").length;
-    const skipped = cases.filter((item) => item.status !== "passed" && item.status !== "failed").length;
-    const time = cases.reduce((sum, item) => sum + (item.durationMs ?? 0), 0) / 1000;
-    const body = cases.map((item) => {
-      const head = `    <testcase classname="${xml(`${project}.${operation}`)}" name="${xml(`${item.name} [${item.scenarioId}]`)}" time="${((item.durationMs ?? 0) / 1000).toFixed(3)}"`;
-      if (item.status === "passed") return `${head}/>`;
-      if (item.status === "failed") return `${head}>\n      <failure message="${xml(failedAssertions(item)[0] ?? "failed")}">${xml(failedAssertions(item).join("\n"))}</failure>\n    </testcase>`;
-      return `${head}>\n      <skipped message="${xml(item.status === "blocked" ? "writes are not allowed in this environment" : item.status)}"/>\n    </testcase>`;
-    }).join("\n");
-    return `  <testsuite name="${xml(operation)}" tests="${cases.length}" failures="${failures}" skipped="${skipped}" time="${time.toFixed(3)}">\n${body}\n  </testsuite>`;
-  });
-  const { totals } = run;
-  return `<?xml version="1.0" encoding="UTF-8"?>\n<testsuites name="${xml(`${project} · ${environment} · ${run.scope}`)}" tests="${totals.total}" failures="${totals.failed}" skipped="${totals.blocked}" time="${((run.durationMs ?? 0) / 1000).toFixed(3)}">\n${suites.join("\n")}\n</testsuites>\n`;
-}
+/** The shareable formats live in the core, where the API renders them too. */
+export { htmlReport, junitReport, renderReport, sarifReport, REPORT_FORMATS, type ReportContext, type ReportFormat } from "@eq/runner-core/report";

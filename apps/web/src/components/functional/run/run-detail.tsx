@@ -6,6 +6,7 @@ import { CaseExplorer, caseKey } from "@/components/case-explorer";
 import { RunComparison, RunStats } from "@/components/functional/run/run-summary";
 import { CaseBreakdown, RequestBreakdown } from "@/components/functional/run/run-breakdowns";
 import { RunCharts } from "@/components/functional/run/run-charts";
+import { ReportMenu } from "@/components/report-menu";
 import { FailureList, PerEndpointTable, RunHighlights } from "@/components/functional/run/run-failures";
 import { useEndpoints } from "@/lib/endpoints";
 import { resultsToCsv, summarizeResults } from "@/lib/results-summary.mjs";
@@ -74,6 +75,7 @@ export function RunDetail({ run, runs, initialCase, busy, onRerun, onRerunFailed
       <p className="text-xs text-slate-500">{run.environment} · <span className="font-mono">{run.baseUrl}</span>{run.stopped && <span className="ml-2 text-amber-700">{t.stopped}</span>}</p>
       <div className="flex flex-wrap gap-2">
         {onRerunFailed && failedKeys.length > 0 && <Button size="1" variant="surface" color="red" onClick={() => onRerunFailed(failedKeys)} disabled={busy} title={busy ? t.busy : t.retryTitle}><RotateCcw className="size-3.5"/>{t.retry(failedKeys.length)}</Button>}
+        <ReportMenu runId={run.id} name={`eq-report-${fileStamp(run.at)}`}/>
         <Button size="1" variant="surface" color="gray" onClick={copy} title={t.copyTitle}>{copied ? <Check className="size-3.5 text-emerald-600"/> : <ClipboardCopy className="size-3.5"/>}{copied ? t.copied : t.copy}</Button>
         <Button size="1" variant="surface" color="gray" onClick={() => download(`eq-results-${fileStamp(run.at)}.md`, markdown(), "text/markdown")}><FileText className="size-3.5"/>Markdown</Button>
         <Button size="1" variant="surface" color="gray" onClick={() => exportJson(run, entries, summary, locale)}><FileJson className="size-3.5"/>{t.exportJson}</Button>
