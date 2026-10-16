@@ -387,4 +387,46 @@ export const DeviceCodeEntity = new EntitySchema<DeviceCodeRow>({
   columns: { id, deviceCodeHash: { type: "varchar", length: 64, name: "device_code_hash" }, userCode: { type: "varchar", length: 16, name: "user_code" }, name: { type: "varchar", length: 200 }, status: { type: "varchar", length: 20 }, workspaceId: { ...ref, name: "workspace_id", nullable: true }, userId: { ...ref, name: "user_id", nullable: true }, expiresAt: { ...stamp, name: "expires_at" }, createdAt: { ...stamp, name: "created_at" } },
 });
 
-export const ENTITIES = [SyncObjectEntity, SyncAliasEntity, SyncConflictEntity, SyncStateEntity, SyncLinkEntity, DeviceCodeEntity, UserEntity, MembershipEntity, InvitationEntity, RefreshTokenEntity, ApiTokenEntity, WorkspaceEntity, ProjectEntity, SpecVersionEntity, OperationEntity, EnvironmentEntity, RunEntity, RunCaseEntity, CredentialEntity];
+/**
+ * A run started by the clock: a cron expression (UTC) and the plan of a functional or load run.
+ * `nextRunAt` is also the claim: a process fires a schedule only if it moves it from the value it
+ * read, so two API processes never start the same occurrence twice.
+ */
+export type ScheduleRow = {
+  id: string; workspaceId: string; projectId: string; environmentId: string; name: string; cron: string; kind: RunKind;
+  plan: Record<string, unknown>; enabled: boolean; nextRunAt: string | null; lastRunAt: string | null; lastRunId: string | null; lastError: string | null;
+  createdBy: string; rev: number; createdAt: string; updatedAt: string;
+};
+
+export type NotificationKind = "webhook" | "slack" | "email";
+/** `change`: only when the verdict flips (passed → failed, failed → passed). */
+export type NotificationTrigger = "always" | "change";
+
+/** Where a finished run is announced. The URL and the signing secret are encrypted like credentials. */
+export type NotificationTargetRow = {
+  id: string; workspaceId: string; projectId: string; name: string; kind: NotificationKind; notifyOn: NotificationTrigger; enabled: boolean;
+  url: string | null; urlHint: string | null; signingSecret: string | null; recipients: string[] | null;
+  lastSentAt: string | null; lastStatus: "ok" | "failed" | null; lastError: string | null;
+  rev: number; createdAt: string; updatedAt: string;
+};
+
+export const ScheduleEntity = new EntitySchema<ScheduleRow>({
+  name: "Schedule", tableName: "schedules",
+  columns: {
+    id, workspaceId: { ...ref, name: "workspace_id" }, projectId: { ...ref, name: "project_id" }, environmentId: { ...ref, name: "environment_id" }, name: { type: "varchar", length: 200 }, cron: { type: "varchar", length: 120 }, kind: { type: "varchar", length: 20 },
+    plan: { type: "simple-json" }, enabled: { type: "boolean" }, nextRunAt: { ...stamp, name: "next_run_at", nullable: true }, lastRunAt: { ...stamp, name: "last_run_at", nullable: true }, lastRunId: { ...ref, name: "last_run_id", nullable: true }, lastError: { type: "text", name: "last_error", nullable: true },
+    createdBy: { type: "varchar", length: 120, name: "created_by" }, rev: { type: "integer" }, createdAt: { ...stamp, name: "created_at" }, updatedAt: { ...stamp, name: "updated_at" },
+  },
+});
+
+export const NotificationTargetEntity = new EntitySchema<NotificationTargetRow>({
+  name: "NotificationTarget", tableName: "notification_targets",
+  columns: {
+    id, workspaceId: { ...ref, name: "workspace_id" }, projectId: { ...ref, name: "project_id" }, name: { type: "varchar", length: 200 }, kind: { type: "varchar", length: 20 }, notifyOn: { type: "varchar", length: 20, name: "notify_on" }, enabled: { type: "boolean" },
+    url: { type: "text", nullable: true }, urlHint: { type: "varchar", length: 300, name: "url_hint", nullable: true }, signingSecret: { type: "text", name: "signing_secret", nullable: true }, recipients: { type: "simple-json", nullable: true },
+    lastSentAt: { ...stamp, name: "last_sent_at", nullable: true }, lastStatus: { type: "varchar", length: 20, name: "last_status", nullable: true }, lastError: { type: "text", name: "last_error", nullable: true },
+    rev: { type: "integer" }, createdAt: { ...stamp, name: "created_at" }, updatedAt: { ...stamp, name: "updated_at" },
+  },
+});
+
+export const ENTITIES = [ScheduleEntity, NotificationTargetEntity, SyncObjectEntity, SyncAliasEntity, SyncConflictEntity, SyncStateEntity, SyncLinkEntity, DeviceCodeEntity, UserEntity, MembershipEntity, InvitationEntity, RefreshTokenEntity, ApiTokenEntity, WorkspaceEntity, ProjectEntity, SpecVersionEntity, OperationEntity, EnvironmentEntity, RunEntity, RunCaseEntity, CredentialEntity];

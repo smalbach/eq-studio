@@ -36,6 +36,8 @@ In local mode the API listens on `http://127.0.0.1:4400`, on the loopback only a
 | `DELETE /v1/runs/:run` | Deletes a run from the history. |
 | `GET /v1/runs/:run/stream` | Server-sent events: `snapshot`, `case`, `progress`, `finished`. |
 | `POST /v1/runs/:run/cancel` · `POST /v1/runs/:run/replay` | Cancel or repeat a run. |
+| `GET/POST /v1/projects/:project/schedules` · `PATCH/DELETE …/schedules/:schedule` · `POST …/schedules/:schedule/run` | Schedules: runs the API starts on its own. See [Schedules and notifications](doc:automatizacion). |
+| `GET/POST /v1/projects/:project/notifications` · `PATCH/DELETE …/notifications/:target` · `POST …/notifications/:target/test` | Where a finished run is announced (webhook, Slack, email). |
 
 With `expectedRev` you avoid overwriting someone else's change: if the project changed since you read it, the answer is **409**.
 
@@ -106,7 +108,7 @@ Fields: `type` (`load`, `stress`, `spike`, `soak`), `baseRps`, `peakRps`, `durat
 
 ## Variables
 
-The API is configured with environment variables. With `pnpm start` (or `pnpm run api`) all of them are read. `eq serve` in local mode only reads `EQ_PORT`, `EQ_HOST`, `EQ_DATA_DIR` and `EQ_SYNC_INTERVAL_SECONDS`; with `EQ_MODE=cloud` it reads the whole configuration from the environment.
+The API is configured with environment variables. With `pnpm start` (or `pnpm run api`) all of them are read. `eq serve` in local mode only reads `EQ_PORT`, `EQ_HOST`, `EQ_DATA_DIR`, `EQ_SYNC_INTERVAL_SECONDS`, `EQ_SCHEDULER_TICK_SECONDS`, `EQ_PUBLIC_URL` and the `EQ_SMTP_*` variables; with `EQ_MODE=cloud` it reads the whole configuration from the environment.
 
 | Variable | Default | What it does |
 | --- | --- | --- |
@@ -131,4 +133,7 @@ The API is configured with environment variables. With `pnpm start` (or `pnpm ru
 | `EQ_CORS_ORIGINS` | — | Allowed origins, comma-separated, if the web app is served from another domain. |
 | `EQ_TRUST_PROXY` | — | Proxy hops to trust (`1` behind a load balancer), for the client address and HTTPS. |
 | `EQ_SYNC_INTERVAL_SECONDS` | `300` locally | How often an installation linked to the cloud syncs on its own (`0`: only on demand). |
+| `EQ_SCHEDULER_TICK_SECONDS` | `30` | How often the API looks for due schedules (`0`: schedules do not fire in this process). |
+| `EQ_PUBLIC_URL` | `http://localhost:<port>` locally | The web app's public address, for the links in notifications. |
+| `EQ_SMTP_HOST` · `EQ_SMTP_PORT` · `EQ_SMTP_SECURE` · `EQ_SMTP_USER` · `EQ_SMTP_PASSWORD` · `EQ_SMTP_FROM` | — · `587` · `true` on 465 | SMTP for email notifications; without `EQ_SMTP_HOST` email is not offered. See [Cloud deployment](doc:deploy). |
 | `EQ_LOG` | — | `debug` for more detail, `silent` for nothing. By default, errors and warnings. |

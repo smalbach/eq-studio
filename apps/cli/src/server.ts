@@ -24,6 +24,10 @@ export async function startServer(options: { port: number; host: string; persist
     secrets: options.persistent ? { type: "file", path: join(DATA_DIR, "secret.key") } : { type: "key", key: randomBytes(32).toString("base64") },
     queue: { driver: "memory", concurrency: 2 },
     sync: { intervalSeconds: options.autoSync ? Math.max(0, Number(process.env.EQ_SYNC_INTERVAL_SECONDS ?? 300) || 0) : 0 },
+    // Schedules fire from the long-running server only, never from one started for a single command.
+    scheduler: { tickSeconds: options.autoSync ? Math.max(0, Number(process.env.EQ_SCHEDULER_TICK_SECONDS ?? 30) || 0) : 0 },
+    smtp: readConfig(process.env).smtp,
+    publicUrl: process.env.EQ_PUBLIC_URL ?? `http://localhost:${options.port}`,
     examplesDir: found.examplesDir,
     webDir: found.webDir,
   };

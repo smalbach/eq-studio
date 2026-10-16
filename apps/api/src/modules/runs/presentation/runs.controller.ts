@@ -13,7 +13,7 @@ import { GetRunQuery, ListRunsQuery } from "../application/queries/run-queries.t
 import { RunStream } from "../application/run-stream.ts";
 
 const locale = z.enum(["es", "en"]).default("es");
-const functionalRun = z.object({
+export const functionalRun = z.object({
   environment: z.string().min(1),
   scope: z.string().max(300).optional(),
   mode: z.enum(ORDER_MODES as ["contract", "safe", "custom"]).default("safe"),
@@ -26,7 +26,7 @@ const functionalRun = z.object({
   delayMs: z.number().int().min(0).max(60_000).default(0),
   locale,
 });
-const loadRun = z.object({
+export const loadRun = z.object({
   environment: z.string().min(1),
   type: z.enum(["load", "stress", "spike", "soak"]).default("load"),
   baseRps: z.number().positive().max(500).default(10),
@@ -45,7 +45,7 @@ const probe = z.object({ environment: z.string().min(1), operationId: z.string()
 const listQuery = z.object({ kind: z.enum(["functional", "load"]).optional(), limit: z.coerce.number().int().optional(), full: z.enum(["true", "false"]).optional() });
 
 /** Who started a run, as the history shows it. */
-const triggeredBy = (actor: Actor) => actor.local ? "local" : actor.userId ? `user:${actor.userId}` : `token:${actor.tokenId}`;
+export const triggeredBy = (actor: Actor) => actor.local ? "local" : actor.userId ? `user:${actor.userId}` : `token:${actor.tokenId}`;
 
 @Controller("v1")
 export class RunsController {
