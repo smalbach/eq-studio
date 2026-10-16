@@ -111,7 +111,11 @@ function statusDetail(status: number, matches: boolean, accepted: number[], reje
   return received;
 }
 
-export async function executeCase(input: CaseRequest, fetchImpl: typeof fetch = fetch): Promise<CaseResult> {
+/**
+ * `specFetch` reads the OpenAPI document: the default credential's connection, even for a case
+ * that sends none (an authenticated `fetch` from `createAuthenticator`, typically).
+ */
+export async function executeCase(input: CaseRequest, fetchImpl: typeof fetch = fetch, specFetch: typeof fetch = fetchImpl): Promise<CaseResult> {
   const locale: Locale = input.locale === "en" ? "en" : "es";
   const t = <V,>(es: V, en: V) => tr(locale, es, en);
   const started = performance.now();
@@ -173,7 +177,7 @@ export async function executeCase(input: CaseRequest, fetchImpl: typeof fetch = 
     let schemaErrors: string[] | null = null;
     let specError: string | null = null;
     try {
-      const spec = await loadSpec(fetchImpl, resolveTarget(input.baseUrl, input.specUrl || DEFAULT_SPEC_PATH), input.specHeaders ?? {}, locale);
+      const spec = await loadSpec(specFetch, resolveTarget(input.baseUrl, input.specUrl || DEFAULT_SPEC_PATH), input.specHeaders ?? {}, locale);
       const declaredSchema = responseSchema(spec, input.operationPath, input.method, checkedStatus, contentType);
       if (declaredSchema) {
         expectedSchema = declaredSchema;

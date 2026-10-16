@@ -42,6 +42,11 @@ export type ExecutionEnvironment = {
   specHeaders?: Record<string, string>;
   /** The headers a case authenticates with, by how it is meant to authenticate. */
   credentialsFor: (scenario: TestScenario) => Record<string, string>;
+  /** The connection a case is sent through, when its credential is more than headers: signed
+   * per request, renewed on a 401, a client certificate (see `createAuthenticator`). */
+  fetchFor?: (scenario: TestScenario) => typeof fetch;
+  /** The connection the OpenAPI document is read through. */
+  specFetch?: typeof fetch;
   /** Existing ids discovered in the environment; empty in the seed itself. */
   lists?: Record<string, string[]>;
   samples?: number;
@@ -82,5 +87,5 @@ export function caseRequest(config: ProjectConfig, env: ExecutionEnvironment, en
  */
 export function directExecutor(config: ProjectConfig, env: ExecutionEnvironment, fetchImpl: typeof fetch = fetch) {
   return (endpoint: Endpoint, scenario: TestScenario, parameterOverrides: Record<string, string> = {}, options: { body?: Record<string, unknown> } = {}): Promise<CaseResult> =>
-    executeCase(caseRequest(config, env, endpoint, scenario, parameterOverrides, options.body), fetchImpl);
+    executeCase(caseRequest(config, env, endpoint, scenario, parameterOverrides, options.body), env.fetchFor?.(scenario) ?? fetchImpl, env.specFetch ?? fetchImpl);
 }

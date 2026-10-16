@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { localized, tr } from "@eq/runner-core";
-import { API, ApiError, type CredentialKind, type CredentialRole, type EnvironmentView } from "@/lib/api";
+import { API, ApiError, type CredentialInput, type CredentialRole, type EnvironmentView } from "@/lib/api";
 import { parsePostmanEnvironment } from "@/lib/postman-environment.mjs";
 import { inspectToken } from "@/lib/environments.mjs";
 import { useProject } from "@/lib/project-store";
@@ -12,7 +12,7 @@ import { useLocale } from "@/lib/i18n";
 
 export type TokenStatus = { dot: string; label: string };
 export type Environment = ReturnType<typeof useEnvironment>;
-export type CredentialDraft = { kind: CredentialKind; secret?: string; headerName?: string | null; username?: string | null; tokenUrl?: string | null; clientId?: string | null; scope?: string | null };
+export type CredentialDraft = CredentialInput;
 
 /** The case the load tests and the id discovery authenticate as. */
 export const DEFAULT_CREDENTIAL_CASE: TestScenario = { id: "default", name: "default", description: "", expectedStatus: 200, flow: "request" };
@@ -96,7 +96,7 @@ export function useEnvironment() {
     setEnvironmentError("");
     try {
       await API.setCredential(project.id, active.environmentId, role, draft);
-      if (role === "primary") setTypedToken(draft.secret ?? "");
+      if (role === "primary") setTypedToken(draft.kind === "bearer" ? draft.secret ?? "" : "");
       await reloadCredentials();
       return true;
     } catch (error) { fail(error); return false; }

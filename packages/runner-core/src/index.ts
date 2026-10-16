@@ -10,6 +10,7 @@ export { discoverIds, remapSeedIds, remapBodyIds, SEED_ID, DEFAULT_MAPPED_ROWS }
 export { tr, localized, LOCALES } from "./i18n.mjs";
 export * from "./execute.ts";
 export * from "./request.ts";
+export * from "./auth.ts";
 export * from "./openapi.ts";
 export * from "./contract-formats.ts";
 export * from "./project-file.ts";

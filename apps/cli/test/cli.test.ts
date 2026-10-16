@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { after, before, test } from "node:test";
 import { createMockServer } from "../../mock-target/server.mjs";
+import { primaryCredential } from "../src/commands.ts";
 import { startServer, type Server } from "../src/server.ts";
 
 const example = fileURLToPath(new URL("../../../examples/mock-store/mock-store.eq.json", import.meta.url));
@@ -102,6 +103,25 @@ test("credentials come from flags or the environment, and drive the 401/403 case
   assert.match(result.stdout, /PASSED/);
   const unauthenticated = await eq(["run", "--file", example, "--env", "local-auth", "--base-url", authUrl, "--read-only", "--quiet"]);
   assert.equal(unauthenticated.code, 1, "without a token the protected reads are 401");
+});
+
+test("the primary credential can be a session cookie or an HMAC key", async () => {
+  const cookie = await eq(["run", "--file", example, "--env", "local-auth", "--base-url", authUrl, "--read-only", "--quiet", "--cookie", "eq_session=admin-session"]);
+  assert.equal(cookie.code, 0, cookie.stdout + cookie.stderr);
+  const hmac = await eq(["run", "--file", example, "--env", "local-auth", "--base-url", authUrl, "--read-only", "--quiet", "--hmac-key-id", "demo-hmac"], { EQ_HMAC_KEY: "hmac-secret" });
+  assert.equal(hmac.code, 0, hmac.stdout + hmac.stderr);
+  assert.equal((await eq(["run", "--file", example, "--token", "t", "--cookie", "a=b"])).code, 2, "one primary credential");
+  assert.equal((await eq(["run", "--file", example, "--client-cert", join(work, "missing.pem")])).code, 2);
+});
+
+test("a client certificate rides on the primary credential, or is the credential", () => {
+  const dir = mkdtempSync(join(work, "pem-"));
+  writeFileSync(join(dir, "c.pem"), "CERT");
+  writeFileSync(join(dir, "k.pem"), "KEY");
+  const tls = { "client-cert": join(dir, "c.pem"), "client-key": join(dir, "k.pem") };
+  assert.deepEqual(primaryCredential({ ...tls, "client-key-passphrase": "p" }), { kind: "mtls", options: { tls: { cert: "CERT" } }, tlsKey: "KEY", tlsPassphrase: "p" });
+  assert.deepEqual(primaryCredential({ ...tls, cookie: "s=v", "client-ca": join(dir, "c.pem") }), { kind: "cookie", secret: "v", options: { cookieName: "s", tls: { cert: "CERT", ca: "CERT" } }, tlsKey: "KEY" });
+  assert.throws(() => primaryCredential({ "client-cert": join(dir, "c.pem") }), /go together/);
 });
 
 test("wrong commands, environments and flags exit 2; an API that is not there exits 3", async () => {

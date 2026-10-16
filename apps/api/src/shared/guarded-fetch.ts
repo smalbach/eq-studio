@@ -44,6 +44,11 @@ function guardedLookup(hostname: string, options: object, callback: (error: Erro
 }
 
 const agent = new Agent({ connect: { lookup: guardedLookup as never, timeout: 10_000 }, headersTimeout: 30_000, bodyTimeout: 60_000 });
+
+/** A connection that presents a client certificate (mutual TLS), or trusts a CA, behind the same guard. */
+export function guardedTlsAgent(tls: { cert?: string; key?: string; passphrase?: string; ca?: string }) {
+  return new Agent({ connect: { lookup: guardedLookup as never, timeout: 10_000, ...tls }, headersTimeout: 30_000, bodyTimeout: 60_000 });
+}
 const MAX_REDIRECTS = 3;
 const MAX_BYTES = 20 * 1024 * 1024;
 
@@ -56,7 +61,9 @@ export async function guardedFetch(input: string | URL | Request, init: RequestI
     if (isIP(host) && isBlockedAddress(host)) throw refuse(host);
     let response: Response;
     try {
-      response = await undiciFetch(url, { ...(options as object), redirect: "manual", dispatcher: agent } as never) as unknown as Response;
+      // A dispatcher in `init` is one of `guardedTlsAgent`: only the engine passes one.
+      const dispatcher = (options as { dispatcher?: Agent }).dispatcher ?? agent;
+      response = await undiciFetch(url, { ...(options as object), redirect: "manual", dispatcher } as never) as unknown as Response;
     } catch (error) {
       // undici reports a refused lookup as a generic "fetch failed"; the reason is its cause.
       let cause: unknown = error;

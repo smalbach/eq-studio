@@ -195,6 +195,8 @@ The first matching rule wins. `path` is a glob over the templated path (`*` one 
 | `enforceLatency` | `true` on localhost | Whether budgets decide the case. |
 | `authEnabled` | `false` | Whether the API enforces credentials: enables the 401/403 cases. |
 
+Credentials never travel in the `.eq.json`, of any kind: neither their secrets (tokens, passwords, refresh tokens, HMAC keys, private keys) nor their setup (a cookie's login, how an HMAC is signed, the client certificate). They live in each environment of the API, encrypted, and are set in the [Credentials](guide:credentials) guide, through the API or with the `eq run` flags. Between machines they only move with [sync](doc:sync), end-to-end encrypted, and only when the workspace has a sync passphrase.
+
 ## load
 
 ```json

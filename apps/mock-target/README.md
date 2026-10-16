@@ -10,6 +10,7 @@ whole test matrix has something real to check. The project that drives it is
 node apps/mock-target/server.mjs --port 4010            # no authentication
 node apps/mock-target/server.mjs --port 4011 --auth     # credentials enforced
 node apps/mock-target/server.mjs --port 4010 --latency 30   # +30 ms per response
+node apps/mock-target/server.mjs --port 4012 --auth --tls-cert server.pem --tls-key server-key.pem --tls-ca ca.pem   # HTTPS, mutual TLS
 ```
 
 Without the repository, `npx endpoint-quality mock` (or `eq mock`, `pnpm eq mock`) starts both at
@@ -32,14 +33,24 @@ Credentials, with `--auth`:
 | `Authorization: Bearer admin-token` | everything |
 | `Authorization: Bearer read-token` | GETs only; writes → 403 |
 | `X-API-Key: demo-key` | everything except DELETE, which answers 401 |
+| `Cookie: eq_session=…` from `POST /auth/login` `{"username":"admin","password":"admin-password"}` (JSON or form) | everything |
+| the same with `reader` / `read-password` | GETs only |
+| `Cookie: eq_session=admin-session` (or `read-session`): a fixed session, for a pasted cookie | everything (GETs only) |
+| HMAC: `X-Key-Id: demo-hmac` (key `hmac-secret`; `read-hmac` / `hmac-read-secret` for GETs only), `X-Timestamp` (Unix seconds, ±5 min), `X-Signature` = hex HMAC-SHA256 of `METHOD\npath?query\ntimestamp\nsha256(body)` | everything |
+| a client certificate signed by `--tls-ca`, over HTTPS | everything |
 | none or unknown | 401 |
+
+`POST /auth/login` is outside the OpenAPI document: it is how a cookie credential logs in, not an
+operation of the store. `mock.expireSessions()` forgets every login session, to test that a
+credential logs in again on a 401. With `--tls-ca` a connection without a client certificate still
+opens: its requests answer 401. The tests generate their certificates at run time; none is committed.
 
 From code:
 
 ```js
 import { createMockServer } from "./apps/mock-target/server.mjs";
 
-const mock = createMockServer({ auth: true, latencyMs: 0, faults: { brokenEnvelope: false, validation: undefined } });
+const mock = createMockServer({ auth: true, latencyMs: 0, faults: { brokenEnvelope: false, validation: undefined }, tls: undefined /* or { cert, key, ca } */ });
 const { url } = await mock.listen(0); // 0 = a free port
 mock.reset();                          // back to the seed
 await mock.close();

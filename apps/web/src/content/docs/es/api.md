@@ -25,8 +25,8 @@ En modo local el API escucha en `http://127.0.0.1:4400`, solo en el loopback y s
 | `GET /v1/projects/:project/queue-preview` | La cola en orden (`?mode=safe\|contract\|custom`, `?readOnly=true`, `?auth=true`, `?endpoints=a,b`, `?order=`, `?locale=`). |
 | `GET/POST /v1/projects/:project/environments` | Entornos. |
 | `PATCH/DELETE …/environments/:environment` | Cambia o borra un entorno. |
-| `GET …/environments/:environment/credentials` | Las credenciales configuradas, nunca el secreto: como mucho sus 4 últimos caracteres. |
-| `PUT …/environments/:environment/credentials/:role` | Guarda una credencial (`primary`, `insufficient`, `alternate`). `kind`: `bearer`, `api_key` (+`headerName`), `basic` (+`username`), `oauth2_client_credentials` (+`tokenUrl`, `clientId`, `scope`). Sin `secret` conserva el que había. |
+| `GET …/environments/:environment/credentials` | Las credenciales configuradas, nunca sus secretos: `lastFour` del principal y `secretHints` de los demás (los 4 últimos caracteres del refresh token, `••••` para una clave PEM). `options` sí vuelve: el certificado es público. |
+| `PUT …/environments/:environment/credentials/:role` | Guarda una credencial (`primary`, `insufficient`, `alternate`). `kind`: `bearer`, `api_key` (+`headerName`), `basic` (+`username`), `oauth2_client_credentials` (+`tokenUrl`, `clientId`, `scope`), `oauth2_authorization_code` (+`tokenUrl`, `clientId`, `scope`, `refreshToken`), `cookie` (+`options.cookieName` u `options.login`), `hmac` (+`options.hmac`), `mtls` (+`options.tls`, `tlsKey`). Cualquier tipo admite `options.tls` + `tlsKey` (+`tlsPassphrase`). Un secreto (`secret`, `refreshToken`, `tlsKey`, `tlsPassphrase`) omitido conserva el guardado; `""` o `null` lo borra. |
 | `DELETE …/environments/:environment/credentials/:role` | Borra la credencial. |
 | `POST /v1/projects/:project/runs` | Lanza una corrida funcional. **202** `{ id, total }`. |
 | `POST /v1/projects/:project/load-runs` | Lanza una prueba de carga. **202** `{ id }`. |
@@ -61,6 +61,18 @@ curl -s -X PUT http://127.0.0.1:4400/v1/projects/store-api/environments/local/cr
 ```
 
 El secreto se cifra al llegar y nunca vuelve en ninguna respuesta. Léelo de una variable de entorno, no lo escribas en el script.
+
+Otros tipos, con la misma ruta (qué pide cada uno, en [Verificación funcional](doc:funcional)):
+
+```json
+{ "kind": "oauth2_authorization_code", "tokenUrl": "https://auth.example.com/oauth/token", "clientId": "store-web", "refreshToken": "…" }
+{ "kind": "cookie", "username": "admin", "secret": "…", "options": { "login": { "path": "/auth/login", "body": "{\"username\":\"{{username}}\",\"password\":\"{{password}}\"}" } } }
+{ "kind": "cookie", "secret": "…", "options": { "cookieName": "session" } }
+{ "kind": "hmac", "secret": "…", "options": { "hmac": { "keyId": "demo-hmac" } } }
+{ "kind": "mtls", "options": { "tls": { "cert": "-----BEGIN CERTIFICATE-----…" } }, "tlsKey": "-----BEGIN PRIVATE KEY-----…" }
+```
+
+Un certificado que no es PEM, una clave que no es su pareja o una frase que no la abre responden **422** con el motivo.
 
 ## Lanzar una corrida y esperar el resultado
 

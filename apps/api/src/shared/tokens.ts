@@ -10,3 +10,5 @@ export const CLOCK = Symbol("Clock");
 export const SECRET_BOX = Symbol("SecretBox");
 export const RUN_QUEUE = Symbol("RunQueue");
 export const HTTP_FETCH = Symbol("HttpFetch");
+/** Builds the connection of a client certificate: `(tls) => dispatcher`, guarded when fetch is. */
+export const HTTP_TLS_AGENT = Symbol("HttpTlsAgent");

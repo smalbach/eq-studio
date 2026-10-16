@@ -77,7 +77,7 @@ El entorno `Local (auth)` apunta al mock del puerto 4011, que exige credenciales
 | `insufficient` | Bearer | `read-token` (solo GET: las escrituras responden 403) |
 | `alternate` | API key en `X-API-Key` | `demo-key` (todo menos DELETE, que responde 401) |
 
-Son valores de prueba del mock, no secretos reales.
+Son valores de prueba del mock, no secretos reales. El mock acepta también una cookie de sesión, una firma HMAC y un certificado de cliente para probar esos tipos: los valores están en [CLI y CI](doc:cli).
 
 ## Sin modo desarrollo
 

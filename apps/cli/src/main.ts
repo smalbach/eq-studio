@@ -41,6 +41,11 @@ Usage
         --token T              primary bearer token            (or EQ_TOKEN)
         --read-token T         insufficient-permission token   (or EQ_READ_TOKEN)
         --api-key K            alternate API key               (or EQ_API_KEY; --api-key-header)
+        --cookie NAME=VALUE    primary credential as a session cookie (or EQ_COOKIE)
+        --hmac-key K           primary credential as an HMAC key (or EQ_HMAC_KEY; --hmac-key-id)
+        --client-cert F --client-key F [--client-key-passphrase P] [--client-ca F]
+                               mutual TLS: alone, or with --token/--cookie/--hmac-key
+                               (passphrase also EQ_CLIENT_KEY_PASSPHRASE)
         --samples N --delay MS --locale en|es --scope "name"
         --junit report.xml     JUnit XML for the CI's test view
         --html report.html     one self-contained HTML page to share (secrets masked)
@@ -104,6 +109,7 @@ export async function main(argv: string[]): Promise<number> {
       file: { type: "string", short: "f" }, env: { type: "string", short: "e" }, "base-url": { type: "string" },
       "read-only": { type: "boolean" }, auth: { type: "boolean" }, "no-auth": { type: "boolean" }, endpoints: { type: "string" },
       token: { type: "string" }, "read-token": { type: "string" }, "api-key": { type: "string" }, "api-key-header": { type: "string" },
+      cookie: { type: "string" }, "hmac-key": { type: "string" }, "hmac-key-id": { type: "string" }, "client-cert": { type: "string" }, "client-key": { type: "string" }, "client-key-passphrase": { type: "string" }, "client-ca": { type: "string" },
       samples: { type: "string" }, delay: { type: "string" }, locale: { type: "string" }, scope: { type: "string" },
       junit: { type: "string" }, json: { type: "string" }, format: { type: "string" }, quiet: { type: "boolean", short: "q" }, "fail-on-blocked": { type: "boolean" },
       type: { type: "string" }, rps: { type: "string" }, peak: { type: "string" }, duration: { type: "string" }, mix: { type: "string" }, p95: { type: "string" }, "no-latency": { type: "boolean" }, preflight: { type: "string" },

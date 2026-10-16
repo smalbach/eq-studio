@@ -193,6 +193,20 @@ for (const database of databases()) {
       assert.deepEqual(there.body.map((item: { role: string; kind: string; lastFour: string }) => [item.role, item.kind, item.lastFour]), [["primary", "bearer", "1234"]]);
     });
 
+    test("every credential kind travels sealed: its settings and its extra secrets too", async () => {
+      const id = (await environment(work)).environmentId;
+      const path = `/v1/projects/mock-store/environments/${id}/credentials`;
+      assert.equal((await work.request("PUT", `${path}/insufficient`, { kind: "oauth2_authorization_code", tokenUrl: "https://idp.example/token", clientId: "app", refreshToken: "refresh-token-abcd" })).status, 200);
+      assert.equal((await work.request("PUT", `${path}/alternate`, { kind: "hmac", secret: "hmac-key-5678", options: { hmac: { keyId: "k1", algorithm: "sha512" } } })).status, 200);
+      await sync(work);
+      await sync(home);
+      const there = (await home.request("GET", path)).body as { role: string; kind: string; options: unknown; secretHints: unknown; lastFour: string }[];
+      const byRole = Object.fromEntries(there.map((item) => [item.role, item]));
+      assert.deepEqual([byRole.insufficient.kind, byRole.insufficient.secretHints], ["oauth2_authorization_code", { refreshToken: "abcd" }]);
+      assert.deepEqual([byRole.alternate.kind, byRole.alternate.options, byRole.alternate.lastFour], ["hmac", { hmac: { keyId: "k1", algorithm: "sha512" } }, "5678"]);
+      assert.equal((await home.request("GET", "/v1/sync")).body.pendingChanges, 0, "what arrived is not pushed back");
+    });
+
     test("a device acts with its person's role: a viewer's changes are refused, entity by entity", async () => {
       const issued = await cloud.request("POST", "/v1/workspace/api-tokens", { name: "Read only", role: "viewer" }, bearer(owner));
       const reader = await start({ type: "sqlite", file: null });

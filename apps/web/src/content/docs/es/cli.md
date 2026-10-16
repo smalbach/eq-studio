@@ -41,6 +41,17 @@ exigiendo credenciales en `:4011` (`Bearer admin-token`; `Bearer read-token` par
 `X-API-Key: demo-key`). `--port` cambia el primero; el segundo es el siguiente. Reiniciarlo deja
 los datos como el seed del ejemplo.
 
+El de `:4011` acepta también los otros tipos de credencial, para probarlos sin un servidor real
+(con permisos de administración; los valores entre paréntesis son de solo lectura, para los 403):
+
+- **Cookie por login**: `POST /auth/login` con `{"username":"admin","password":"admin-password"}`
+  (`reader` / `read-password`) responde un `Set-Cookie: eq_session=…`.
+- **Cookie pegada**: `eq_session=admin-session` (`read-session`).
+- **HMAC**: `X-Key-Id: demo-hmac` con la clave `hmac-secret` (`read-hmac` / `hmac-read-secret`), la
+  plantilla por defecto en sha256 hex y una hora a ±5 minutos.
+- **mTLS**: `node apps/mock-target/server.mjs --port 4011 --auth --tls-cert server.crt --tls-key server.key --tls-ca ca.crt`
+  sirve HTTPS y acepta como administrador un certificado de cliente firmado por esa CA.
+
 ## Corridas en CI
 
 Lo más simple en un pipeline es correr **desde el archivo del proyecto**: `eq` levanta un API
@@ -53,8 +64,9 @@ eq run --file store-api.eq.json --env staging \
 ```
 
 - `--base-url` sustituye la URL del entorno: el mismo archivo sirve para cada rama o despliegue.
-- Las credenciales llegan por flags o variables (`EQ_TOKEN`, `EQ_READ_TOKEN`, `EQ_API_KEY`),
-  nunca desde el archivo: el `.eq.json` se versiona sin secretos.
+- Las credenciales llegan por flags o variables (`EQ_TOKEN`, `EQ_READ_TOKEN`, `EQ_API_KEY`,
+  `EQ_COOKIE`, `EQ_HMAC_KEY`, `EQ_CLIENT_KEY_PASSPHRASE`), nunca desde el archivo: el `.eq.json`
+  se versiona sin secretos.
 - `--junit` escribe un reporte JUnit XML, `--html` una página autocontenida para compartir y
   `--sarif` un archivo SARIF para el escaneo de código (ver "Informes para compartir" más abajo).
   `--json` guarda la corrida completa.
@@ -70,6 +82,10 @@ eq run --file store-api.eq.json --env staging \
 | `--token T` | Credencial `primary`, bearer (o `EQ_TOKEN`). |
 | `--read-token T` | Credencial `insufficient`, bearer, para los 403 (o `EQ_READ_TOKEN`). |
 | `--api-key K` · `--api-key-header H` | Credencial `alternate`, API key (o `EQ_API_KEY`), y su cabecera. |
+| `--cookie NOMBRE=VALOR` | Credencial `primary` como cookie de sesión pegada (o `EQ_COOKIE`). En lugar de `--token`. |
+| `--hmac-key K` · `--hmac-key-id ID` | Credencial `primary` como clave HMAC, con la firma por defecto (o `EQ_HMAC_KEY`). En lugar de `--token`. |
+| `--client-cert ARCHIVO --client-key ARCHIVO` | Certificado de cliente (mTLS) PEM en la credencial `primary`: solo, o sumado a `--token`, `--cookie` o `--hmac-key`. |
+| `--client-key-passphrase P` · `--client-ca ARCHIVO` | La frase de la clave (o `EQ_CLIENT_KEY_PASSPHRASE`) y la CA PEM con la que confiar en el servidor. |
 | `--samples N` · `--delay MS` | Muestras por caso y pausa entre casos. |
 | `--locale es\|en` | Idioma de los nombres de los casos (por defecto `en`). |
 | `--scope "nombre"` | Un nombre para la corrida en el historial y en el reporte. |

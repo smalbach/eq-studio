@@ -76,7 +76,7 @@ Por defecto, los tokens, API keys y contraseñas de los entornos no salen del eq
 EQ_SYNC_PASSPHRASE='una frase larga que solo conoce tu equipo' eq sync --secrets on
 ```
 
-La passphrase (12+ caracteres) se escribe en cada equipo; nunca se envía. De ella se deriva una clave (scrypt) que cifra cada credencial con AES-256-GCM antes de salir; la nube guarda un texto que no puede leer ni usar. El primer equipo fija la passphrase del workspace; los demás deben usar la misma, y la app lo comprueba al activarla.
+La passphrase (12+ caracteres) se escribe en cada equipo; nunca se envía. De ella se deriva una clave (scrypt) que cifra cada credencial entera (de cualquier tipo: su configuración, su secreto y los demás, como un refresh token, una clave HMAC o el certificado de cliente con su clave privada) con AES-256-GCM antes de salir; la nube guarda un texto que no puede leer ni usar. El primer equipo fija la passphrase del workspace; los demás deben usar la misma, y la app lo comprueba al activarla.
 
 > Si se pierde la passphrase, las credenciales se vuelven a escribir: no hay forma de recuperarlas, por diseño. La passphrase de un workspace no se puede cambiar.
 
