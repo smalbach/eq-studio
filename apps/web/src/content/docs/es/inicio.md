@@ -91,7 +91,7 @@ Compila la app y la sirve desde el propio API en `http://127.0.0.1:4400`: un sol
 
 Cada proyecto es una API: su contrato, sus entornos, credenciales y corridas. Puedes tener todos los que quieras en la misma instalación. La pantalla de inicio, **Proyectos**, los lista con un buscador y un orden (recientes o por nombre).
 
-1. **Proyectos → Nuevo proyecto** abre la guía desde cero. **Proyectos → Importar** crea uno de una vez desde un contrato OpenAPI (URL, archivo o pegado) o un `.eq.json`.
+1. **Proyectos → Nuevo proyecto** abre la guía desde cero. **Proyectos → Importar** crea uno de una vez desde un contrato —OpenAPI 3.0/3.1, Swagger 2.0 o una colección de Postman— (URL, archivo o pegado) o un `.eq.json`. Ver [formatos aceptados](doc:conceptos).
 2. El proyecto nuevo se abre en su **Panel**: contrato, última corrida funcional y última prueba de carga.
 3. Para cambiar, vuelve a **Proyectos** (primera entrada del menú, o **Proyecto → Cambiar de proyecto** en el encabezado) y pulsa **Entrar** en otro.
 

@@ -8,6 +8,7 @@
  * API without stated budgets gets no latency assertion until someone writes one.
  */
 import { dereference } from "./contract.mjs";
+import { toOpenApi3 } from "./contract-formats.ts";
 import type { BudgetRule, GeoPlugin, HttpMethod, IdSource, ParameterSample, ProjectConfig, ProjectOperation, RequestSchemas } from "./types.ts";
 
 type Json = Record<string, unknown>;
@@ -24,6 +25,7 @@ export function operationIdFor(method: string, path: string) {
 /** A plausible value for a schema: its example, its default, its first enum value, or one by type. */
 export function sampleFor(schemaInput: unknown, depth = 0): unknown {
   const schema = asRecord(schemaInput);
+  if ("const" in schema) return schema.const;
   if ("example" in schema) return schema.example;
   if (Array.isArray(schema.examples) && schema.examples.length) return schema.examples[0];
   if ("default" in schema) return schema.default;
@@ -60,8 +62,12 @@ export function sampleFor(schemaInput: unknown, depth = 0): unknown {
   return null;
 }
 
+/** The non-null type of a schema: OpenAPI 3.1 writes a nullable string as `type: [string, "null"]`. */
+const typeOf = (schema: Json) => Array.isArray(schema.type) ? schema.type.find((item) => item !== "null") : schema.type;
+
 function parameterSamples(schemaInput: unknown, invalidStatus: number | undefined): ParameterSample[] {
-  const schema = asRecord(schemaInput);
+  const input = asRecord(schemaInput);
+  const schema: Json = { ...input, type: typeOf(input) };
   if (Array.isArray(schema.enum) && schema.enum.length) return schema.enum.slice(0, 3).map((value) => ({ value: String(value) }));
   if (schema.type === "boolean") return [{ value: "true" }, { value: "false" }];
   const samples: ParameterSample[] = [{ value: String(sampleFor(schema) ?? "sample") }];
@@ -73,10 +79,9 @@ function parameterSamples(schemaInput: unknown, invalidStatus: number | undefine
   return samples;
 }
 
-function jsonSchemaOf(content: unknown) {
+function jsonMediaOf(content: unknown) {
   const media = asRecord(content);
-  const json = media["application/json"] ?? Object.entries(media).find(([type]) => type.includes("json"))?.[1];
-  return asRecord(json).schema;
+  return asRecord(media["application/json"] ?? Object.entries(media).find(([type]) => type.includes("json"))?.[1]);
 }
 
 /** A schema as the project keeps it: what validates, without the prose. */
@@ -85,15 +90,15 @@ function compactSchema(value: unknown): unknown {
   if (!value || typeof value !== "object") return value;
   return Object.fromEntries(Object.entries(value as Json).filter(([key]) => key !== "description").map(([key, item]) => [key, key === "properties" ? Object.fromEntries(Object.entries(asRecord(item)).map(([name, property]) => [name, compactSchema(property)])) : compactSchema(item)]));
 }
+const jsonSchemaOf = (content: unknown) => jsonMediaOf(content).schema;
 
 export type ImportedProject = { config: ProjectConfig; warnings: string[] };
 
+/** Any accepted contract — OpenAPI 3.x, Swagger 2.0, a Postman collection — converted to OpenAPI 3 first. */
 export function projectFromOpenApi(input: unknown, options: { name?: string } = {}): ImportedProject {
-  const spec = asRecord(input);
-  const warnings: string[] = [];
-  if (typeof spec.openapi !== "string" || !spec.openapi.startsWith("3.")) {
-    throw new Error(typeof spec.swagger === "string" ? "Swagger 2.0 is not supported: convert it to OpenAPI 3 first." : "Not an OpenAPI 3 document.");
-  }
+  const normalized = toOpenApi3(input);
+  const spec = normalized.document;
+  const warnings: string[] = [...normalized.warnings];
   const info = asRecord(spec.info);
   const globalSecurity = Array.isArray(spec.security) ? spec.security : [];
   const operations: ProjectOperation[] = [];
@@ -132,9 +137,10 @@ export function projectFromOpenApi(input: unknown, options: { name?: string } = 
       const security = Array.isArray(operation.security) ? operation.security : globalSecurity;
       if (!security.length || security.some((requirement) => Object.keys(asRecord(requirement)).length === 0)) publicOperations.push(id);
       if (["post", "put", "patch"].includes(method)) {
-        const schema = jsonSchemaOf(asRecord(operation.requestBody).content);
-        if (schema) {
-          const generated = sampleFor(schema);
+        const media = jsonMediaOf(asRecord(dereference(operation.requestBody, spec)).content);
+        if (media.schema) {
+          // An example the contract gives for the whole body beats one generated from its schema.
+          const generated = "example" in media ? media.example : sampleFor(dereference(media.schema, spec));
           if (generated && typeof generated === "object" && !Array.isArray(generated)) {
             const body = generated as Json;
             // A PATCH changes one thing: the first writable field is enough to prove it persists.

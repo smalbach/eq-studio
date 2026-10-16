@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Badge, Button, Checkbox, Flex, Link, RadioCards, Spinner, Table, Text, TextArea, TextField } from "@radix-ui/themes";
 import { FileUp, Lock, Play, PlugZap, RotateCcw } from "lucide-react";
 import { parseProjectFile } from "@eq/runner-core";
-import { baseUrlOf, documentKind, parseDocument, specPathFor } from "@/lib/project-documents";
+import { baseUrlOf, documentKind, parseDocument, readImportFiles, specPathFor } from "@/lib/project-documents";
 import { CredentialFields, credentialDraftOf, credentialState, EMPTY_CREDENTIAL, type CredentialForm } from "@/components/guide/credential-fields";
 import { Example, Field, fetchMatrix, GuideFrame, isActive, Notice, ProbeOutcome, readTarget, RunProgress, useGuideDraft, useRunPoll, errorText } from "@/components/guide/guide-kit";
 import type { GuideEntry } from "@/components/guide/guides";
@@ -15,10 +15,13 @@ import { defineMessages, useLocale, useMessages } from "@/lib/i18n";
 const MESSAGES = defineMessages({
   es: {
     nameTitle: "¿Cómo se llama la API?", nameIntro: "El nombre del proyecto: lo verás en la cabecera, en los reportes y en el archivo .eq.json.", name: "Nombre del proyecto", nameHint: "Algo que distinga esta API de las demás. Lo puedes cambiar después.",
-    contractTitle: "El contrato", contractIntro: "El documento OpenAPI 3 de la API. De él salen las operaciones, sus status y parámetros, y una primera configuración de casos.",
-    fromExample: "Usar un ejemplo", fromExampleHint: "Un proyecto completo contra la API de ejemplo incluida.", fromUrl: "URL de OpenAPI", fromUrlHint: "El API de Endpoint Quality lee el documento: sin CORS de por medio.", fromFile: "Archivo o texto", fromFileHint: "Un OpenAPI en JSON o YAML, o un .eq.json exportado.",
-    specUrl: "URL del documento OpenAPI", specUrlHint: "Por ejemplo http://127.0.0.1:4010/openapi.json. Debe ser alcanzable desde el equipo donde corre el API.",
-    file: "Elegir archivo", paste: "o pega el documento", parsed: (kind: string) => `Documento reconocido: ${kind}.`, notOpenApi: "No es un OpenAPI 3 ni un archivo .eq.json.",
+    contractTitle: "El contrato", contractIntro: "El contrato de la API: OpenAPI 3.0 o 3.1, Swagger 2.0 (se convierte a OpenAPI 3) o una colección de Postman v2.1 (se genera un OpenAPI 3 desde sus solicitudes). De él salen las operaciones, sus status y parámetros, y una primera configuración de casos.",
+    fromExample: "Usar un ejemplo", fromExampleHint: "Un proyecto completo contra la API de ejemplo incluida.", fromUrl: "URL del contrato", fromUrlHint: "El API de Endpoint Quality lee el documento: sin CORS de por medio.", fromFile: "Archivo o texto", fromFileHint: "Un OpenAPI o Swagger en JSON o YAML, una colección de Postman (con su entorno, si quieres) o un .eq.json exportado.",
+    specUrl: "URL del contrato", specUrlHint: "Por ejemplo http://127.0.0.1:4010/openapi.json. Debe ser alcanzable desde el equipo donde corre el API.",
+    file: "Elegir archivo", paste: "o pega el documento", parsed: (kind: string) => `Documento reconocido: ${kind}.`, notOpenApi: "No es un OpenAPI 3, un Swagger 2.0, una colección de Postman ni un archivo .eq.json.",
+    kinds: { openapi: "OpenAPI 3", project: ".eq.json", swagger: "Swagger 2.0 — se convertirá a OpenAPI 3.0", postman: "colección de Postman — se generará un OpenAPI 3 con schemas inferidos de sus ejemplos", "postman-environment": "entorno de Postman — elige también la colección" } as Record<string, string>,
+    environmentFile: (name: string, url: string) => `Entorno de Postman «${name}»${url ? `: la URL base será ${url}` : ""}.`,
+    converted: { swagger: "El contrato era Swagger 2.0 y se convirtió a OpenAPI 3.0.", postman: "El contrato se generó desde una colección de Postman: los schemas se infirieron de sus ejemplos. Revísalos antes de confiar en la validación." } as Record<string, string>,
     examples: "Ejemplos incluidos", operations: (n: number) => `${n} operaciones`, environments: (n: number) => `${n} entornos`, loadingExamples: "Leyendo los ejemplos…",
     mockHint: "El ejemplo apunta a la API de ejemplo incluida. «pnpm run dev» ya la arranca en los puertos 4010 (sin autenticación) y 4011 (con autenticación); por separado: «pnpm run mock» y «pnpm run mock:auth».",
     created: (name: string) => `Proyecto «${name}» creado.`, createdNext: "Siguiente continúa con este proyecto.", startOver: "Empezar de nuevo", create: "Crear el proyecto",
@@ -35,10 +38,13 @@ const MESSAGES = defineMessages({
   },
   en: {
     nameTitle: "What is the API called?", nameIntro: "The project's name: you will see it in the header, the reports and the .eq.json file.", name: "Project name", nameHint: "Something that tells this API apart from the others. You can change it later.",
-    contractTitle: "The contract", contractIntro: "The API's OpenAPI 3 document. The operations, their statuses and parameters, and a first configuration of cases come from it.",
-    fromExample: "Use an example", fromExampleHint: "A complete project against the bundled example API.", fromUrl: "OpenAPI URL", fromUrlHint: "The Endpoint Quality API reads the document: no CORS involved.", fromFile: "File or text", fromFileHint: "An OpenAPI in JSON or YAML, or an exported .eq.json.",
-    specUrl: "OpenAPI document URL", specUrlHint: "For example http://127.0.0.1:4010/openapi.json. It must be reachable from the machine where the API runs.",
-    file: "Choose file", paste: "or paste the document", parsed: (kind: string) => `Document recognized: ${kind}.`, notOpenApi: "Not an OpenAPI 3 document nor a .eq.json file.",
+    contractTitle: "The contract", contractIntro: "The API's contract: OpenAPI 3.0 or 3.1, Swagger 2.0 (converted to OpenAPI 3) or a Postman collection v2.1 (an OpenAPI 3 is generated from its requests). The operations, their statuses and parameters, and a first configuration of cases come from it.",
+    fromExample: "Use an example", fromExampleHint: "A complete project against the bundled example API.", fromUrl: "Contract URL", fromUrlHint: "The Endpoint Quality API reads the document: no CORS involved.", fromFile: "File or text", fromFileHint: "An OpenAPI or Swagger in JSON or YAML, a Postman collection (with its environment, if you like) or an exported .eq.json.",
+    specUrl: "Contract URL", specUrlHint: "For example http://127.0.0.1:4010/openapi.json. It must be reachable from the machine where the API runs.",
+    file: "Choose file", paste: "or paste the document", parsed: (kind: string) => `Document recognized: ${kind}.`, notOpenApi: "Not an OpenAPI 3, Swagger 2.0 or Postman collection document, nor a .eq.json file.",
+    kinds: { openapi: "OpenAPI 3", project: ".eq.json", swagger: "Swagger 2.0 — it will be converted to OpenAPI 3.0", postman: "Postman collection — an OpenAPI 3 will be generated with schemas inferred from its examples", "postman-environment": "Postman environment — pick the collection too" } as Record<string, string>,
+    environmentFile: (name: string, url: string) => `Postman environment "${name}"${url ? `: the base URL will be ${url}` : ""}.`,
+    converted: { swagger: "The contract was Swagger 2.0 and was converted to OpenAPI 3.0.", postman: "The contract was generated from a Postman collection: schemas were inferred from its examples. Review them before trusting the validation." } as Record<string, string>,
     examples: "Bundled examples", operations: (n: number) => `${n} operations`, environments: (n: number) => `${n} environments`, loadingExamples: "Reading the examples…",
     mockHint: "The example points at the bundled example API. \"pnpm run dev\" already starts it on ports 4010 (no authentication) and 4011 (authentication); on their own: \"pnpm run mock\" and \"pnpm run mock:auth\".",
     created: (name: string) => `Project "${name}" created.`, createdNext: "Next goes on with this project.", startOver: "Start over", create: "Create the project",
@@ -56,8 +62,8 @@ const MESSAGES = defineMessages({
 });
 
 type Source = "example" | "url" | "file";
-type Draft = { name: string; source: Source; example: string; specUrl: string; projectId: string; projectName: string; baseUrlGuess: string; warnings: string[]; environment: string; tested: boolean; skipTest: boolean; runId: string };
-const INITIAL: Draft = { name: "", source: "example", example: "", specUrl: "", projectId: "", projectName: "", baseUrlGuess: "", warnings: [], environment: "", tested: false, skipTest: false, runId: "" };
+type Draft = { name: string; source: Source; example: string; specUrl: string; projectId: string; projectName: string; baseUrlGuess: string; warnings: string[]; sourceFormat?: string | null; environment: string; tested: boolean; skipTest: boolean; runId: string };
+const INITIAL: Draft = { name: "", source: "example", example: "", specUrl: "", projectId: "", projectName: "", baseUrlGuess: "", warnings: [], sourceFormat: null, environment: "", tested: false, skipTest: false, runId: "" };
 
 /**
  * The way in: from nothing to a first saved run. The project is created at the contract step,
@@ -69,6 +75,8 @@ export function FirstProjectGuide({ guide, workspace, env, step, onStep, onDone 
   const locale = useLocale();
   const [draft, update, reset] = useGuideDraft<Draft>("first-project", INITIAL);
   const [text, setText] = useState("");
+  const [postmanEnvironment, setPostmanEnvironment] = useState<{ name: string; baseUrl?: string; variables: Record<string, string> } | null>(null);
+  const [fileError, setFileError] = useState("");
   const [credential, setCredential] = useState<CredentialForm>(EMPTY_CREDENTIAL);
   const [probe, setProbe] = useState<ProbeResult | null>(null);
   const [probeError, setProbeError] = useState("");
@@ -96,8 +104,9 @@ export function FirstProjectGuide({ guide, workspace, env, step, onStep, onDone 
   /** Opens the new project and moves on. The step changes first: while the workspace had no
    * project the shell showed this guide as its only screen, and the URL must say "guide" before
    * the project appears or the shell would leave the guide. */
-  async function created(id: string, name: string, warnings: string[] = [], baseUrlGuess = "") {
-    update({ projectId: id, projectName: name, warnings, baseUrlGuess, environment: "", tested: false, skipTest: false, runId: "" });
+  async function created(id: string, name: string, warnings: string[] = [], baseUrlGuess = "", sourceFormat: string | null = null) {
+    // The conversion is said once, in the reader's language, by `sourceFormat`.
+    update({ projectId: id, projectName: name, warnings: warnings.filter((warning) => !/^(Converted from Swagger 2\.0|Generated from a Postman collection)/.test(warning)), baseUrlGuess, sourceFormat, environment: "", tested: false, skipTest: false, runId: "" });
     go(2);
     workspace.open(id);
     await workspace.refresh();
@@ -117,10 +126,10 @@ export function FirstProjectGuide({ guide, workspace, env, step, onStep, onDone 
       const result = await API.createProject({ name, spec: { url: draft.specUrl.trim() } });
       let origin = "";
       try { origin = new URL(draft.specUrl).origin; } catch { /* checked by the step's validation */ }
-      await created(result.id, name, result.warnings, origin);
+      await created(result.id, name, result.warnings, result.baseUrl ?? origin, result.sourceFormat);
       return false;
     }
-    if (!parsed?.kind) return false;
+    if (!parsed?.kind || parsed.kind === "postman-environment") return false;
     if (parsed.kind === "project") {
       const file = parseProjectFile(parsed.document);
       const imported = await API.importProject({ ...file, project: { ...file.project, name: name || file.project.name } });
@@ -128,7 +137,7 @@ export function FirstProjectGuide({ guide, workspace, env, step, onStep, onDone 
       return false;
     }
     const result = await API.createProject({ name, spec: { document: parsed.document } });
-    await created(result.id, name, result.warnings, baseUrlOf(parsed.document));
+    await created(result.id, name, result.warnings, postmanEnvironment?.baseUrl || result.baseUrl || baseUrlOf(parsed.document, undefined, postmanEnvironment?.variables), result.sourceFormat);
     return false;
   }
 
@@ -184,7 +193,7 @@ export function FirstProjectGuide({ guide, workspace, env, step, onStep, onDone 
   </GuideFrame>;
 
   if (current === 1) {
-    const valid = Boolean(projectId) || (draft.source === "example" ? Boolean(draft.example) : draft.source === "url" ? /^https?:\/\/\S+$/.test(draft.specUrl.trim()) : Boolean(parsed?.kind));
+    const valid = Boolean(projectId) || (draft.source === "example" ? Boolean(draft.example) : draft.source === "url" ? /^https?:\/\/\S+$/.test(draft.specUrl.trim()) : Boolean(parsed?.kind) && parsed?.kind !== "postman-environment");
     return <GuideFrame {...frame} title={t.contractTitle} intro={t.contractIntro} canNext={valid} next={createProject} nextLabel={projectId ? undefined : t.create} doc="formato"
       example={<Example code={draft.source === "url" ? "http://127.0.0.1:4010/openapi.json" : `openapi: 3.1.0\ninfo: { title: Store API, version: 1.0.0 }\nservers: [{ url: "http://127.0.0.1:4010" }]\npaths:\n  /v1/orders:\n    get:\n      operationId: listOrders\n      tags: [orders]\n      responses: { "200": { description: OK } }`}>
         <p>{draft.source === "example" ? t.mockHint : draft.source === "url" ? t.specUrlHint : t.fromFileHint}</p>
@@ -205,9 +214,11 @@ export function FirstProjectGuide({ guide, workspace, env, step, onStep, onDone 
         </div>}
         {draft.source === "url" && <Field label={t.specUrl} hint={t.specUrlHint}><TextField.Root size="2" type="url" value={draft.specUrl} onChange={(event) => update({ specUrl: event.target.value })} placeholder="http://127.0.0.1:4010/openapi.json" className="mt-1 font-mono"/></Field>}
         {draft.source === "file" && <div className="space-y-2">
-          <Button asChild size="2" variant="surface" color="gray"><label className="cursor-pointer"><FileUp className="size-3.5"/>{t.file}<input type="file" accept=".json,.yaml,.yml,application/json" className="sr-only" onChange={async (event) => { const file = event.target.files?.[0]; if (file) setText(await file.text()); }}/></label></Button>
+          <Button asChild size="2" variant="surface" color="gray"><label className="cursor-pointer"><FileUp className="size-3.5"/>{t.file}<input type="file" multiple accept=".json,.yaml,.yml,application/json" className="sr-only" onChange={async (event) => { const files = [...(event.target.files ?? [])]; event.target.value = ""; setFileError(""); try { const read = await readImportFiles(files, locale); if (read.environment) setPostmanEnvironment(read.environment); if (read.contract) setText(JSON.stringify(read.contract.document, null, 2)); } catch (failure) { setFileError(errorText(failure)); } }}/></label></Button>
           <Field label={t.paste}><TextArea size="1" value={text} onChange={(event) => setText(event.target.value)} rows={9} spellCheck={false} className="mt-1 font-mono text-[11px] leading-5" placeholder={"openapi: 3.1.0\ninfo: …"}/></Field>
-          {parsed && (parsed.kind ? <Notice tone="ok">{t.parsed(parsed.kind === "project" ? ".eq.json" : "OpenAPI 3")}</Notice> : <Notice tone="error">{t.notOpenApi}</Notice>)}
+          {parsed && (parsed.kind ? <Notice tone={parsed.kind === "openapi" || parsed.kind === "project" ? "ok" : "warn"}>{t.parsed(t.kinds[parsed.kind])}</Notice> : <Notice tone="error">{t.notOpenApi}</Notice>)}
+          {postmanEnvironment && <Notice>{t.environmentFile(postmanEnvironment.name, postmanEnvironment.baseUrl ?? "")}</Notice>}
+          {fileError && <Notice tone="error">{fileError}</Notice>}
         </div>}
       </>}
     </GuideFrame>;
@@ -241,6 +252,7 @@ export function FirstProjectGuide({ guide, workspace, env, step, onStep, onDone 
             <Table.Cell className="px-3 text-slate-500"><span className="flex items-center gap-1">{needAuth.includes(operation) && <Lock className="size-3" aria-label={t.needAuth}/>}{bodies.includes(operation.id) && <span title={t.bodies} className="font-mono">{"{…}"}</span>}</span></Table.Cell>
           </Table.Row>)}</Table.Body></Table.Root>
         </div>
+        {draft.sourceFormat && t.converted[draft.sourceFormat] && <Notice tone="warn">{t.converted[draft.sourceFormat]}</Notice>}
         {draft.warnings.length > 0 && <Notice tone="warn"><strong>{t.warnings}</strong>{"\n"}{draft.warnings.join("\n")}</Notice>}
       </>}
     </GuideFrame>;

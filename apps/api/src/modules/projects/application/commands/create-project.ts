@@ -1,7 +1,7 @@
 import { Inject } from "@nestjs/common";
 import { CommandHandler, EventBus, type ICommandHandler } from "@nestjs/cqrs";
 import type { DataSource } from "typeorm";
-import { projectFromOpenApi } from "@eq/runner-core";
+import { projectFromOpenApi, type ContractFormat } from "@eq/runner-core";
 import type { ProjectRow } from "../../../../database/entities.ts";
 import { isoNow, uuidv7 } from "../../../../shared/ids.ts";
 import { DATA_SOURCE } from "../../../../shared/tokens.ts";
@@ -15,7 +15,8 @@ import { ProjectRepository } from "../../infrastructure/project.repository.ts";
 
 export type CreateProjectInput = { name?: string; slug?: string; spec?: SpecSource; generateConfig?: boolean; environments?: EnvironmentInput[] };
 export class CreateProjectCommand { constructor(readonly workspaceId: string, readonly input: CreateProjectInput) {} }
-export type CreateProjectResult = { id: string; slug: string; specVersionId: string | null; warnings: string[] };
+/** `sourceFormat` and `baseUrl` say what the contract was and where it says the API runs, for the first environment. */
+export type CreateProjectResult = { id: string; slug: string; specVersionId: string | null; warnings: string[]; sourceFormat: ContractFormat | null; baseUrl: string | null };
 
 /**
  * A project, optionally from its contract in one step: the document is read **before** anything
@@ -56,7 +57,7 @@ export class CreateProjectHandler implements ICommandHandler<CreateProjectComman
         await this.environments.save(row, tx);
         published.push(new EnvironmentChanged(workspaceId, project.id, row.id, "created"));
       }
-      return { id: project.id, slug, specVersionId: project.activeSpecVersionId, warnings: spec?.parsed.warnings ?? [] };
+      return { id: project.id, slug, specVersionId: project.activeSpecVersionId, warnings: spec?.parsed.warnings ?? [], sourceFormat: spec?.parsed.sourceFormat ?? null, baseUrl: spec?.parsed.baseUrl ?? null };
     });
     // Published after the commit: a subscriber never sees an event whose rows were rolled back.
     this.events.publishAll(published);

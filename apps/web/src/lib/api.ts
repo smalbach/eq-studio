@@ -6,7 +6,7 @@
  * can show exactly which field was wrong.
  */
 import { accessToken, currentWorkspace, getSession, refreshSession, signedOut } from "@/lib/session";
-import type { CaseResult, EnvironmentConfig, ProjectConfig, ProjectFile, ProjectOperation, SpecDiff, SpecDiffSummary, TestScenario } from "@eq/runner-core";
+import type { CaseResult, ContractFormat, EnvironmentConfig, ProjectConfig, ProjectFile, ProjectOperation, SpecDiff, SpecDiffSummary, TestScenario } from "@eq/runner-core";
 
 export class ApiError extends Error {
   constructor(readonly status: number, readonly title: string, message: string, readonly errors: string[] = []) {
@@ -85,14 +85,14 @@ const project = (id: string) => `/v1/projects/${encodeURIComponent(id)}`;
 export const API = {
   projects: () => api<ProjectSummary[]>("GET", "/v1/projects"),
   project: (id: string) => api<ProjectDetail>("GET", project(id)),
-  createProject: (input: { name?: string; spec?: { url: string } | { document: unknown }; environments?: Partial<EnvironmentConfig>[]; generateConfig?: boolean }) => api<{ id: string; slug: string; warnings: string[] }>("POST", "/v1/projects", input),
+  createProject: (input: { name?: string; spec?: { url: string } | { document: unknown }; environments?: Partial<EnvironmentConfig>[]; generateConfig?: boolean }) => api<{ id: string; slug: string; warnings: string[]; sourceFormat: ContractFormat | null; baseUrl: string | null }>("POST", "/v1/projects", input),
   importProject: (file: unknown) => api<{ id: string; slug: string }>("POST", "/v1/projects/import", { file }),
   updateProject: (id: string, changes: { name?: string; slug?: string; expectedRev?: number }) => api<{ rev: number }>("PATCH", project(id), changes),
   archiveProject: (id: string) => api<null>("DELETE", project(id)),
   exportProject: (id: string) => api<ProjectFile>("GET", `${project(id)}/export`),
 
   specVersions: (id: string) => api<SpecVersionView[]>("GET", `${project(id)}/spec-versions`),
-  importSpec: (id: string, source: { url: string } | { document: unknown }) => api<{ id: string; created: boolean; operationCount: number; warnings: string[]; diff: { from: string; summary: SpecDiffSummary } | null }>("POST", `${project(id)}/spec-versions`, { source }),
+  importSpec: (id: string, source: { url: string } | { document: unknown }) => api<{ id: string; created: boolean; operationCount: number; warnings: string[]; sourceFormat: ContractFormat; diff: { from: string; summary: SpecDiffSummary } | null }>("POST", `${project(id)}/spec-versions`, { source }),
   specDiff: (id: string, from?: string, to?: string) => api<SpecDiffView>("GET", `${project(id)}/specs/diff?${new URLSearchParams({ ...(from ? { from } : {}), ...(to ? { to } : {}) })}`),
   activateSpec: (id: string, version: string) => api<null>("POST", `${project(id)}/spec-versions/${version}/activate`),
   operations: (id: string) => api<ProjectOperation[]>("GET", `${project(id)}/operations`),

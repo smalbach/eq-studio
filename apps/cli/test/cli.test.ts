@@ -120,6 +120,23 @@ test("diff compares two contracts, from a URL or a file, and exits 1 on a breaki
   assert.equal((await eq(["diff", same, join(work, "missing.json")])).code, 2);
 });
 
+test("import takes a contract too: Swagger 2.0 in YAML, and a Postman collection with its environment", async () => {
+  const api = ["--api", server.url];
+  const fixtures = fileURLToPath(new URL("../../../packages/runner-core/test/fixtures/", import.meta.url));
+  const yaml = join(work, "petstore.yaml");
+  writeFileSync(yaml, "swagger: '2.0'\ninfo: { title: Petstore YAML, version: 1.0.0 }\nhost: localhost:8080\npaths:\n  /pets:\n    get:\n      responses: { '200': { description: OK } }\n");
+  const swagger = await eq(["import", yaml, ...api]);
+  assert.equal(swagger.code, 0, swagger.stderr);
+  assert.match(swagger.stderr, /imported as petstore-yaml \(converted from Swagger 2\.0\)/);
+  assert.match(swagger.stderr, /environment: http:\/\/localhost:8080/);
+  const postman = await eq(["import", join(fixtures, "store.postman_collection.json"), "--env", join(fixtures, "store.postman_environment.json"), "--name", "From Postman", ...api]);
+  assert.equal(postman.code, 0, postman.stderr);
+  assert.match(postman.stderr, /imported as from-postman \(generated from a Postman collection/);
+  const environments = await (await fetch(`${server.url}/v1/projects/from-postman/environments`)).json() as { name: string; baseUrl: string }[];
+  assert.deepEqual(environments.map((item) => [item.name, item.baseUrl]), [["Staging", "https://staging.example.com"]]);
+  assert.equal((await eq(["import", join(fixtures, "store.postman_environment.json"), ...api])).code, 2, "an environment alone is not a contract");
+});
+
 test("a short load test passes and prints its verdict", async () => {
   const junit = join(work, "load.xml");
   const result = await eq(["load", "--file", example, "--env", "local", "--base-url", mockUrl, "--rps", "5", "--duration", "2", "--p95", "1000", "--junit", junit]);

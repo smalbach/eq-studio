@@ -6,6 +6,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { spawn } from "node:child_process";
 import { changesByOperation, describeChange, diffSpecs } from "@eq/runner-core";
 import { parseSpec } from "@eq/api/spec";
+import { contractFormatOf, postmanEnvironmentVariables, toOpenApi3 } from "@eq/runner-core";
 import { CliError, client, EXIT, waitForRun, type Client, type Run } from "./client.ts";
 import { bold, dim, green, junitReport, red, textReport, yellow } from "./report.ts";
 import { startServer, type Server } from "./server.ts";
@@ -191,13 +192,40 @@ export async function exportProject(project: string | undefined, flags: Flags) {
   return EXIT.ok;
 }
 
+/**
+ * A new project from a file: a `.eq.json` as it is, or a contract — OpenAPI 3, Swagger 2.0 (JSON
+ * or YAML) or a Postman collection — that the API converts and generates a configuration from.
+ * A contract gets a first environment at the base URL it declares, `--base-url`, or the one a
+ * Postman environment (`--env file.postman_environment.json`) gives the collection's `{{baseUrl}}`.
+ */
 export async function importProject(path: string | undefined, flags: Flags) {
-  if (!path) throw new CliError("Give the .eq.json file to import", EXIT.usage);
+  if (!path) throw new CliError("Give the file to import: a .eq.json, an OpenAPI 3 or Swagger 2.0 document (JSON or YAML), or a Postman collection", EXIT.usage);
   const api = remote(flags);
-  let file: unknown;
-  try { file = JSON.parse(readFileSync(path, "utf8")); } catch (error) { throw new CliError(`Cannot read ${path}: ${error instanceof Error ? error.message : String(error)}`, EXIT.usage); }
-  const created = await api.post<{ slug: string }>("/v1/projects/import", { file });
-  log(`${green("✓")} imported as ${bold(created.slug)}`);
+  const read = (file: string) => { try { return readFileSync(file, "utf8"); } catch (error) { throw new CliError(`Cannot read ${file}: ${error instanceof Error ? error.message : String(error)}`, EXIT.usage); } };
+  const text = read(path);
+  let parsed: unknown = null;
+  try { parsed = JSON.parse(text); } catch { /* YAML: the API reads it */ }
+  if ((parsed as Record<string, unknown> | null)?.format === "endpoint-quality/project") {
+    const created = await api.post<{ slug: string }>("/v1/projects/import", { file: parsed });
+    log(`${green("✓")} imported as ${bold(created.slug)}`);
+    return EXIT.ok;
+  }
+  const environmentFile = str(flags, "env");
+  let environment: { name?: string; variables: Record<string, string> } | undefined;
+  if (environmentFile) {
+    let document: unknown;
+    try { document = JSON.parse(read(environmentFile)); } catch (error) { if (error instanceof CliError) throw error; throw new CliError(`${environmentFile} is not JSON`, EXIT.usage); }
+    if (!Array.isArray((document as { values?: unknown })?.values)) throw new CliError(`${environmentFile} is not a Postman environment: it has no "values"`, EXIT.usage);
+    environment = { name: typeof (document as { name?: unknown }).name === "string" ? (document as { name: string }).name : undefined, variables: postmanEnvironmentVariables(document) };
+  }
+  const local = parsed && contractFormatOf(parsed) === "postman" && environment ? toOpenApi3(parsed, { variables: environment.variables }).baseUrl : undefined;
+  const created = await api.post<{ id: string; slug: string; warnings: string[]; sourceFormat: string | null; baseUrl: string | null }>("/v1/projects", { name: str(flags, "name"), spec: { document: parsed ?? text } });
+  const baseUrl = (str(flags, "base-url") ?? local ?? created.baseUrl)?.replace(/\/+$/, "");
+  if (baseUrl) await api.post(`/v1/projects/${created.slug}/environments`, { name: environment?.name ?? baseUrl.replace(/^https?:\/\//, ""), baseUrl });
+  const origin = created.sourceFormat === "swagger" ? " (converted from Swagger 2.0)" : created.sourceFormat === "postman" ? " (generated from a Postman collection: its schemas are inferred, review them)" : "";
+  log(`${green("✓")} imported as ${bold(created.slug)}${origin}`);
+  for (const warning of created.warnings.filter((item) => !/^(Converted from Swagger|Generated from a Postman)/.test(item))) log(dim(`  ${warning}`));
+  log(baseUrl ? dim(`  environment: ${baseUrl}`) : dim("  no base URL: add an environment, or import again with --base-url"));
   return EXIT.ok;
 }
 

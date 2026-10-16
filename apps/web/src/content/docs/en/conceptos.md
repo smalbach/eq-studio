@@ -8,7 +8,17 @@ An API you want to verify. It holds its contract, its configuration (what to tes
 
 ## Contract and contract version
 
-The API's **OpenAPI 3** document. Importing it stores a **version**: an immutable copy identified by its hash. Importing the same content twice gives the same version; importing a new one creates another and activates it. Runs always use the active version, never a document that changes halfway through.
+The API's contract: an **OpenAPI 3** document, or one converted to OpenAPI 3 on import (Swagger 2.0, a Postman collection). Importing it stores a **version**: an immutable copy identified by its hash. Importing the same content twice gives the same version; importing a new one creates another and activates it. Runs always use the active version, never a document that changes halfway through.
+
+### Accepted formats
+
+| Format | What is done with it |
+| --- | --- |
+| **OpenAPI 3.0 and 3.1** (JSON or YAML) | Used as it is. With 3.1, nullable types (`type: [string, "null"]`), `const`, `examples`, `prefixItems`, numeric `exclusiveMinimum`, `patternProperties`, `if`/`then`/`else` and the rest of the JSON Schema 2020-12 that responses use are validated. |
+| **Swagger 2.0** (JSON or YAML) | **Converted to OpenAPI 3.0** on import: `definitions` becomes `components.schemas`, `host`/`basePath`/`schemes` become `servers`, `body` and `formData` parameters become `requestBody`, `produces`/`consumes` become `content`, and `securityDefinitions` become `securitySchemes`. The app says it was converted. |
+| **Postman collection v2.1** (and v2.0) | An **OpenAPI 3.0 is generated** from its requests: method and path (`{{var}}` and `:var` become path parameters), query, headers, JSON body, folders as tags and saved responses as statuses. **Schemas are inferred from the examples**, so review them: one example does not say which fields are optional. The first environment's base URL comes from the collection's variable (`{{baseUrl}}`) or from the Postman environment you pick alongside it. |
+
+What is stored as the version is the resulting OpenAPI 3, and its hash is that document's. The conversion is deterministic: the same Swagger file or collection imported twice is still the same version.
 
 From each operation of the contract the method, path, tag, **declared statuses** and **parameters** are taken. A declared status enables its cases: if your API answers 409 but the contract does not declare it, nobody tests it.
 

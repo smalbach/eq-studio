@@ -104,7 +104,7 @@ export function mapEnvironmentValues(values) {
 export function parsePostmanEnvironment(source, fallbackName = "Entorno importado", locale = "es") {
   const document = readPostmanJson(source, locale);
   if (!document || typeof document !== "object" || Array.isArray(document)) throw new Error(tr(locale, "El archivo no contiene un objeto JSON.", "The file does not contain a JSON object."));
-  if (Array.isArray(document.item) || document.info) throw new Error(tr(locale, "Eso es una colección de Postman, no un entorno. Importa un archivo `*.postman_environment.json`.", "That is a Postman collection, not an environment. Import a `*.postman_environment.json` file."));
+  if (Array.isArray(document.item) || document.info) throw new Error(tr(locale, "Eso es una colección de Postman, no un entorno: impórtala como contrato desde «Importar» en Proyectos. Aquí va un archivo `*.postman_environment.json`.", "That is a Postman collection, not an environment: import it as a contract from \"Import\" in Projects. This takes a `*.postman_environment.json` file."));
   if (!Array.isArray(document.values)) throw new Error(tr(locale, "No parece un entorno de Postman: falta el arreglo `values`.", "Does not look like a Postman environment: the `values` array is missing."));
   const scope = document._postman_variable_scope;
   if (scope && scope !== "environment") throw new Error(tr(locale, `El archivo declara scope \`${scope}\`, y el dashboard solo aplica entornos.`, `The file declares scope \`${scope}\`, and the dashboard only applies environments.`));
@@ -119,6 +119,8 @@ export function parsePostmanEnvironment(source, fallbackName = "Entorno importad
     variables,
     /** What the panel reports: an environment that maps nothing is imported and says so. */
     mapped: ENVIRONMENT_FIELDS.filter((field) => fields[field]),
+    /** Every enabled variable with a value, for resolving a collection's `{{baseUrl}}` on import. */
+    variableValues: Object.fromEntries(document.values.filter((entry) => entry && entry.enabled !== false && typeof entry.key === "string" && entry.value != null && String(entry.value) !== "").map((entry) => [entry.key, String(entry.value)])),
   };
 }
 
