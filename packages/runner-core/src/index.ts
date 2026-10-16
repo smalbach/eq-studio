@@ -11,3 +11,4 @@ export * from "./execute.ts";
 export * from "./request.ts";
 export * from "./openapi.ts";
 export * from "./project-file.ts";
+export * from "./spec-diff.ts";

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -96,6 +96,28 @@ test("against a running API: import, list, run and export", async () => {
   const output = join(work, "exported.eq.json");
   assert.equal((await eq(["export", "mock-store", "-o", output, ...api])).code, 0);
   assert.equal(JSON.parse(readFileSync(output, "utf8")).project.name, "Mock Store");
+});
+
+test("diff compares two contracts, from a URL or a file, and exits 1 on a breaking change", async () => {
+  const contract = await (await fetch(`${mockUrl}/openapi.json`)).json() as { paths: Record<string, unknown> };
+  const same = join(work, "same.json");
+  writeFileSync(same, JSON.stringify(contract));
+  const unchanged = await eq(["diff", `${mockUrl}/openapi.json`, same]);
+  assert.equal(unchanged.code, 0, unchanged.stderr);
+  assert.match(unchanged.stdout, /No changes/);
+  delete contract.paths["/health"];
+  const changed = join(work, "changed.json");
+  writeFileSync(changed, JSON.stringify(contract));
+  const breaking = await eq(["diff", same, changed]);
+  assert.equal(breaking.code, 1, breaking.stderr);
+  assert.match(breaking.stdout, /GET \/health/);
+  assert.match(breaking.stdout, /✖ breaking {2}operation removed/);
+  assert.match(breaking.stdout, /1 breaking · 0 non-breaking/);
+  const asJson = await eq(["diff", "--json", changed, same]);
+  assert.equal(asJson.code, 0, "an added operation breaks nothing");
+  assert.deepEqual(json(asJson.stdout).changes.map((change: { kind: string; path: string }) => [change.kind, change.path]), [["operation-added", "/health"]]);
+  assert.equal((await eq(["diff", same])).code, 2);
+  assert.equal((await eq(["diff", same, join(work, "missing.json")])).code, 2);
 });
 
 test("a short load test passes and prints its verdict", async () => {

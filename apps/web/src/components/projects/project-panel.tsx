@@ -6,6 +6,7 @@ import { API, ApiError } from "@/lib/api";
 import type { Workspace } from "@/lib/use-workspace";
 import { download } from "@/lib/format";
 import { defineMessages, useMessages } from "@/lib/i18n";
+import { SpecVersions } from "@/components/projects/spec-versions";
 
 const MESSAGES = defineMessages({
   es: {
@@ -95,5 +96,7 @@ export function ProjectPanel({ workspace, busy, onClose, onGuide, onSwitch }: { 
 
     {notice && <Callout.Root size="1" color="green" role="status" className="mt-3"><Callout.Icon><CircleCheck className="size-4"/></Callout.Icon><Callout.Text>{notice}</Callout.Text></Callout.Root>}
     {error && <Callout.Root size="1" color="red" role="alert" className="mt-3"><Callout.Icon><CircleAlert className="size-4"/></Callout.Icon><Callout.Text className="whitespace-pre-line">{error}</Callout.Text></Callout.Root>}
+
+    {project.id && <SpecVersions workspace={workspace} projectId={project.id} busy={busy}/>}
   </div>;
 }

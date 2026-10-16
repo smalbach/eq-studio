@@ -95,7 +95,7 @@ read from `EQ_API_URL`.
 | Code | Means |
 |---|---|
 | `0` | Every case passed |
-| `1` | A case failed (or writes were blocked, with `--fail-on-blocked`) |
+| `1` | A case failed (or writes were blocked, with `--fail-on-blocked`); for `eq diff`, a change breaks |
 | `2` | The command was wrong: a flag, a project or an environment that does not exist |
 | `3` | It could not run: the API does not answer, or the run ended in error |
 
@@ -164,6 +164,35 @@ As a CI gate, a short test at the expected rate with a p95 of your own:
 ```bash
 eq load --file store-api.eq.json --env staging --base-url "$STAGING_URL" \
   --type load --rps 20 --duration 60 --p95 500 --junit eq-load.xml
+```
+
+## Contract changes
+
+`eq diff` compares two OpenAPI 3 contracts (files or http(s) URLs, JSON or YAML) and lists what
+changed per operation, marking what breaks clients of the older one. It exits `1` when any change
+breaks: a CI step that stops a contract change before it ships.
+
+```bash
+eq diff https://api.example.com/openapi.json openapi.yaml
+```
+
+```text
+GET /v1/products (listProducts)
+  ✖ breaking  response 200: field $.data[].price removed
+POST /v1/products (createProduct)
+  ✖ breaking  request: required field $.currency added
+  · change    query.dry_run: optional parameter added
+2 breaking · 1 non-breaking
+```
+
+`--json` prints the changes and their counts as JSON; `--locale es` describes them in Spanish.
+What counts as breaking is in [Concepts](doc:conceptos).
+
+In GitHub Actions, against the main branch's contract (`actions/checkout` with `fetch-depth: 0`):
+
+```yaml
+- run: git show origin/main:openapi.yaml > /tmp/openapi-main.yaml
+- run: npx endpoint-quality diff /tmp/openapi-main.yaml openapi.yaml
 ```
 
 ## Projects as files

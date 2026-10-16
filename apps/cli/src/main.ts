@@ -6,12 +6,13 @@
  *   eq run --file p.eq.json      the same, without any server running
  *   eq load …                    a load, stress, spike or soak test
  *   eq mock                      the example API the Mock Store project runs against
+ *   eq diff <old> <new>          what changed between two contracts; exit 1 if it breaks clients
  *   eq projects | export | import
  *   eq login <url> | sync | logout   this installation and a cloud workspace
  */
 import { parseArgs } from "node:util";
 import { CliError, EXIT } from "./client.ts";
-import { exportProject, importProject, load, mock, projects, run, serve, type Flags } from "./commands.ts";
+import { diff, exportProject, importProject, load, mock, projects, run, serve, type Flags } from "./commands.ts";
 import { red } from "./report.ts";
 import { login, logout, sync } from "./sync.ts";
 import { VERSION } from "./runtime.ts";
@@ -54,6 +55,12 @@ Usage
   eq mock [--port 4010]             the example API (a fictional store) for the Mock Store project:
                                     no auth on 4010, with auth on 4011 (Bearer admin-token)
 
+  eq diff <old> <new> [--json] [--locale en|es]
+      What changed between two OpenAPI 3 contracts (files or http(s) URLs, JSON or YAML),
+      grouped by operation and marked breaking or not. Exit 1 when a change breaks clients of
+      the old one — a CI step that stops a contract change before it ships. --json (or
+      --format json) prints the changes and their counts as JSON.
+
   eq projects [--format json]       the projects of the API
   eq export <project> [-o file]     a project as a .eq.json file
   eq import <file.eq.json>          a .eq.json file as a new project
@@ -68,12 +75,14 @@ Usage
       (EQ_SYNC_INTERVAL_SECONDS; 0 turns it off).
   eq logout                         unlinks (the data stays here; the device's token is revoked)
 
-Exit codes: 0 passed · 1 cases failed · 2 wrong command, project or environment · 3 could not run.
+Exit codes: 0 passed · 1 cases failed (or breaking changes) · 2 wrong command, project or environment · 3 could not run.
 `;
 
 export async function main(argv: string[]): Promise<number> {
+  // For `eq diff`, --json takes no file: it is what is printed.
+  const args = argv.find((item) => !item.startsWith("-")) === "diff" ? argv.map((item) => item === "--json" ? "--format=json" : item) : argv;
   const { values, positionals } = parseArgs({
-    args: argv,
+    args,
     allowPositionals: true,
     strict: true,
     options: {
@@ -90,13 +99,14 @@ export async function main(argv: string[]): Promise<number> {
     },
   });
   const flags = values as Flags;
-  const [command, argument] = positionals;
+  const [command, argument, second] = positionals;
   if (values.version) { process.stdout.write(`${VERSION}\n`); return EXIT.ok; }
   if (values.help || !command || command === "help") { process.stdout.write(HELP); return command || values.help ? EXIT.ok : EXIT.usage; }
   switch (command) {
     case "serve": return serve(flags);
     case "run": return run(argument, flags);
     case "load": return load(argument, flags);
+    case "diff": return diff(argument, second, flags);
     case "projects": return projects(flags);
     case "mock": return mock(flags);
     case "export": return exportProject(argument, flags);

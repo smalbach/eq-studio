@@ -35,6 +35,7 @@
   },
   "exports": {
     "./app": "./src/app.ts",
-    "./config": "./src/config.ts"
+    "./config": "./src/config.ts",
+    "./spec": "./src/modules/specs/domain/spec.ts"
   }
 }

@@ -40,6 +40,16 @@ for (const database of databases()) {
       const changed = await h.request("POST", "/v1/projects/mock-store-api/spec-versions", { source: { document: spec } });
       assert.equal(changed.body.created, true);
       assert.equal(changed.body.operationCount, example.project.operations.length - 1);
+      assert.equal(again.body.diff, null, "an existing version brings no diff");
+      assert.deepEqual(changed.body.diff.summary, { breaking: 1, nonBreaking: 0, operationsAdded: 0, operationsRemoved: 1, operationsChanged: 0 });
+      const diff = await h.request("GET", "/v1/projects/mock-store-api/specs/diff");
+      assert.equal(diff.status, 200, JSON.stringify(diff.body));
+      assert.equal(diff.body.from.version, "1.0.0");
+      assert.equal(diff.body.to.id, changed.body.id);
+      assert.deepEqual(diff.body.changes.map((change: { kind: string; path: string; breaking: boolean }) => [change.kind, change.path, change.breaking]), [["operation-removed", "/health", true]]);
+      const reverse = await h.request("GET", `/v1/projects/mock-store-api/spec-versions/diff?from=${changed.body.id}&to=${diff.body.from.id}`);
+      assert.deepEqual(reverse.body.summary, { breaking: 0, nonBreaking: 1, operationsAdded: 1, operationsRemoved: 0, operationsChanged: 0 });
+      assert.equal((await h.request("GET", "/v1/projects/mock-store-api/specs/diff?from=nope")).status, 404);
       const versions = await h.request("GET", "/v1/projects/mock-store-api/spec-versions");
       assert.deepEqual(versions.body.map((version: { version: string; active: boolean }) => [version.version, version.active]), [["1.1.0", true], ["1.0.0", false]]);
       assert.equal(versions.body[0].document, undefined, "the listing leaves the documents out");
@@ -47,6 +57,8 @@ for (const database of databases()) {
       assert.equal(rollback.status, 204);
       const operations = await h.request("GET", "/v1/projects/mock-store-api/operations");
       assert.equal(operations.body.length, example.project.operations.length);
+      const oldest = await h.request("GET", "/v1/projects/mock-store-api/specs/diff");
+      assert.equal(oldest.body.from, null, "the oldest version has nothing before it");
     });
 
     test("scenarios and the queue preview come from the engine, reads first and deletes last", async () => {
