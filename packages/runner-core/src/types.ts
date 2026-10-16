@@ -36,7 +36,7 @@ export type Endpoint = ContractOperation & {
   replaceBody?: Record<string, unknown>;
 };
 
-export type ScenarioFlow = "request" | "create-read" | "replace-read" | "patch-read" | "delete-read" | "deleted-read" | "bulk-read" | "conflict" | "existing";
+export type ScenarioFlow = "request" | "create-read" | "replace-read" | "patch-read" | "delete-read" | "deleted-read" | "bulk-read" | "conflict" | "existing" | "negative";
 
 /** How a case authenticates: the primary credential, none, one with too little scope, or the
  * alternate credential (an API key, typically). */
@@ -51,7 +51,25 @@ export type TestScenario = {
   body?: Record<string, unknown>;
   flow: ScenarioFlow;
   auth?: ScenarioAuth;
+  /** Any of these passes; `expectedStatus` is the one shown. Set by the negative cases, which
+   * accept whichever 4xx the contract declares. */
+  expectedStatuses?: number[];
+  /** A body sent exactly as written instead of `body` serialized: the malformed-JSON case. */
+  rawBody?: string;
+  /** What a generated negative case breaks in the input. */
+  negative?: NegativeKind;
 };
+
+/**
+ * The kinds of bad input the negative cases send, one fault per case: a required member left
+ * out, the wrong type, `null` where it is not nullable, a string past its length bounds, a number
+ * past its range, a value outside the enum, a broken format, a member the schema closes out, a
+ * body that is not JSON at all.
+ */
+export type NegativeKind = "missing" | "type" | "null" | "max-length" | "min-length" | "minimum" | "maximum" | "enum" | "format" | "extra" | "malformed";
+
+/** The input schemas of one operation, dereferenced: its JSON body and each parameter by name. */
+export type RequestSchemas = { body?: Record<string, unknown>; parameters?: Record<string, Record<string, unknown>> };
 
 /** A scenario as a project writes it: the same, with texts that can carry both languages. */
 export type ScenarioTemplate = Omit<TestScenario, "name" | "description"> & { name: LocalizedText; description: LocalizedText };
@@ -115,6 +133,18 @@ export type ProjectConfig = {
   operationScenarios?: Record<string, ScenarioTemplate[]>;
   /** Scenarios appended after the generated functional ones of an operation. */
   extraScenarios?: Record<string, ScenarioTemplate[]>;
+  /** What each operation accepts as input, from the contract: what the negative cases break. */
+  requestSchemas?: Record<string, RequestSchemas>;
+  /** The negative cases: bad input that must be a 4xx, never a 2xx or a 5xx. On by default. */
+  negativeCases?: {
+    enabled?: boolean;
+    /** At most this many per operation (default 10), picked one kind at a time. */
+    maxPerOperation?: number;
+    /** Operations that get none. */
+    exclude?: string[];
+    /** The statuses that count as a rejection. Default: the 4xx the operation declares, or 400/422. */
+    statuses?: number[];
+  };
   plugins?: {
     geo?: GeoPlugin;
     pagination?: { cursorParam: string; invalidValue: string; expectedStatus?: number };

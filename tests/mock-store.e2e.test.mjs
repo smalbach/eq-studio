@@ -4,7 +4,8 @@
  * The example project in `examples/mock-store` is loaded exactly as a user would load it, pointed
  * at a mock started on a free port, and every case it generates is run through the same runner
  * the dashboard uses. Every case must be green — and the reverse must hold too: a mock that
- * breaks its envelope must turn a case red for the schema, or a green matrix would prove nothing.
+ * breaks its envelope must turn a case red for the schema, and one that accepts or crashes on
+ * invalid input must turn the negative cases red, or a green matrix would prove nothing.
  *
  *   node --test tests/mock-store.e2e.test.mjs
  */
@@ -122,6 +123,21 @@ describe("mock store, authentication off", () => {
     const shape = (operations) => operations.map(({ id, method, path, statuses, parameters }) => ({ id, method, path, statuses, parameters }));
     assert.deepEqual(shape(project.operations), shape(imported.operations));
     assert.deepEqual(project.auth?.publicOperations, imported.auth?.publicOperations);
+    assert.deepEqual(project.requestSchemas, imported.requestSchemas, "the negative cases break the schemas the mock declares");
+  });
+
+  test("the negative cases cover every kind of bad input, and every one is answered with a 4xx", async () => {
+    const outcomes = (await runMatrix(environment)).filter(({ scenario }) => scenario.negative);
+    assert.ok(outcomes.length >= 100, `a real set of negative cases (${outcomes.length})`);
+    const kinds = new Set(outcomes.map(({ scenario }) => scenario.negative));
+    for (const kind of ["malformed", "missing", "type", "null", "min-length", "max-length", "minimum", "maximum", "enum", "format", "extra"]) assert.ok(kinds.has(kind), `a ${kind} case ran`);
+    const cap = project.negativeCases?.maxPerOperation ?? 10;
+    for (const endpoint of endpoints) assert.ok(outcomes.filter((outcome) => outcome.endpoint.id === endpoint.id).length <= cap, `${endpoint.id} stays within the cap`);
+    for (const { endpoint, scenario, result } of outcomes) {
+      const answered = result.steps.find((step) => step.request.method === endpoint.method)?.actual?.status;
+      assert.ok(answered >= 400 && answered < 500, `${endpoint.id} · ${scenario.id} answered ${answered}`);
+    }
+    assert.deepEqual(await counts(environment.baseUrl), SEED_COUNTS);
   });
 });
 
@@ -149,6 +165,69 @@ describe("mock store, authentication on", () => {
     assert.equal((await fetch(`${environment.baseUrl}/health`)).status, 200);
     assert.equal((await fetch(`${environment.baseUrl}/openapi.json`)).status, 200);
     assert.equal((await fetch(`${environment.baseUrl}/v1/products`)).status, 401);
+  });
+});
+
+/** Every negative case of the matrix, run against an environment. */
+async function runNegatives(environment) {
+  const env = { baseUrl: environment.baseUrl, credentialsFor, enforceLatency: false, locale: "en" };
+  const runner = createScenarioRunner(endpoints, project, directExecutor(project, env), undefined, undefined, "en");
+  const queue = buildQueue(endpoints, project, { mode: "safe", customOrder: [], caseSelection: {}, authEnabled: false, locale: "en" }).filter(({ scenario }) => scenario.negative);
+  const outcomes = [];
+  for (const { endpoint, scenario } of queue) outcomes.push({ endpoint, scenario, result: await runner.runScenario(endpoint, scenario) });
+  return outcomes;
+}
+
+const statusAssertion = (result) => result.steps.flatMap((step) => step.assertions).find((assertion) => assertion.label.startsWith("Status") && !assertion.pass);
+
+describe("mock store that accepts invalid bodies", () => {
+  const mock = createMockServer({ faults: { validation: "lenient" } });
+  let environment;
+  before(async () => {
+    clearSpecCache();
+    const { url } = await mock.listen(0);
+    environment = environmentFor("local", url);
+  });
+  after(() => mock.close());
+
+  test("every body case it accepts is red, and whatever it created is deleted", async () => {
+    const outcomes = await runNegatives(environment);
+    // Only the members of a body are lax: a body that is not JSON, the bulk's envelope, a
+    // parameter and an id are still rejected.
+    const lax = outcomes.filter(({ endpoint, scenario }) => scenario.id.startsWith("negative-body-") && scenario.negative !== "malformed" && !endpoint.path.endsWith("/bulk"));
+    assert.ok(lax.length > 40);
+    for (const { endpoint, scenario, result } of lax) {
+      assert.equal(result.ok, false, `${endpoint.id} · ${scenario.id} must fail`);
+      assert.match(statusAssertion(result)?.detail ?? "", /accepted invalid input/, `${endpoint.id} · ${scenario.id}`);
+    }
+    const cleaned = lax.filter(({ endpoint }) => endpoint.method === "POST");
+    assert.ok(cleaned.every(({ result }) => result.steps.some((step) => step.request.method === "DELETE" && step.actual?.status === 204)), "every create that was accepted is deleted");
+    const isolated = lax.filter(({ endpoint }) => endpoint.method === "PUT" || endpoint.method === "PATCH");
+    assert.ok(isolated.every(({ result }) => result.steps[0].request.method === "POST" && result.steps.at(-1).request.method === "DELETE"), "a PUT or PATCH runs over a temporary row");
+    assert.ok(outcomes.filter((outcome) => !lax.includes(outcome)).every(({ result }) => result.ok), "everything still validated stays green");
+    assert.deepEqual(await counts(environment.baseUrl), SEED_COUNTS, "nothing is left behind");
+    assert.deepEqual((await (await fetch(`${environment.baseUrl}/v1/stores/1`)).json()).data.name, "Market Square", "the seed rows were never the target");
+  });
+});
+
+describe("mock store that crashes on invalid bodies", () => {
+  const mock = createMockServer({ faults: { validation: "crash" } });
+  let environment;
+  before(async () => {
+    clearSpecCache();
+    const { url } = await mock.listen(0);
+    environment = environmentFor("local", url);
+  });
+  after(() => mock.close());
+
+  test("a 5xx to invalid input is always a failure, and says so", async () => {
+    const outcomes = await runNegatives(environment);
+    const crashed = outcomes.filter(({ result }) => result.steps.some((step) => step.actual?.status === 500));
+    assert.ok(crashed.length > 40);
+    for (const { endpoint, scenario, result } of crashed) {
+      assert.equal(result.ok, false, `${endpoint.id} · ${scenario.id}`);
+      assert.match(statusAssertion(result)?.detail ?? "", /never a server error/);
+    }
   });
 });
 

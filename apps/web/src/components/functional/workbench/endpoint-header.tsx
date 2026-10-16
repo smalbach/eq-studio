@@ -1,6 +1,9 @@
-import { Badge, Button, Checkbox, Spinner } from "@radix-ui/themes";
+import { useState } from "react";
+import { Badge, Button, Checkbox, SegmentedControl, Spinner } from "@radix-ui/themes";
+import { isNegativeScenario } from "@eq/runner-core";
 import { Play } from "lucide-react";
 import { MethodBadge } from "@/components/common/method-badge";
+import { InfoTip } from "@/components/info-tip";
 import type { Workbench } from "@/components/functional/workbench/use-workbench";
 import type { OperationStatus } from "@/lib/run-types";
 import { cn } from "@/lib/utils";
@@ -15,7 +18,9 @@ const MESSAGES = defineMessages({
     allCases: "Todos los casos",
     tests: (n: number) => `${n} pruebas`,
     include: (name: string) => `Incluir el caso ${name}`,
-    expects: (status: number) => `espera ${status}`,
+    expects: (status: number | string) => `espera ${status}`,
+    negative: "negativo",
+    kinds: "Tipo de caso", kindAll: (n: number) => `Todos ${n}`, kindFunctional: (n: number) => `Funcionales ${n}`, kindNegative: (n: number) => `Negativos ${n}`,
     willRun: (active: number, total: number) => `Se ejecutarán ${active} de los ${total} casos de este endpoint, en orden y respetando el delay configurado.`,
     implemented: "Implementado",
     pending: "Pendiente",
@@ -34,7 +39,9 @@ const MESSAGES = defineMessages({
     allCases: "All cases",
     tests: (n: number) => `${n} tests`,
     include: (name: string) => `Include the case ${name}`,
-    expects: (status: number) => `expects ${status}`,
+    expects: (status: number | string) => `expects ${status}`,
+    negative: "negative",
+    kinds: "Kind of case", kindAll: (n: number) => `All ${n}`, kindFunctional: (n: number) => `Functional ${n}`, kindNegative: (n: number) => `Negative ${n}`,
     willRun: (active: number, total: number) => `${active} of this endpoint's ${total} cases will run, in order and honoring the configured delay.`,
     implemented: "Implemented",
     pending: "Pending",
@@ -52,16 +59,20 @@ const DOT: Record<OperationStatus, string> = { running: "animate-pulse bg-sky-50
 function CaseChips({ bench, busy, operationStates, hasResult }: { bench: Workbench; busy: boolean; operationStates: Record<string, OperationStatus>; hasResult: (scenarioId?: string) => boolean }) {
   const t = useMessages(MESSAGES);
   const { selected, scenarios, selectedScenario, activeCases, caseSelection } = bench;
+  // The negative cases can outnumber the rest: a filter keeps the functional ones in reach.
+  const [kind, setKind] = useState<"all" | "functional" | "negative">("all");
+  const negatives = scenarios.filter(isNegativeScenario).length;
+  const shown = scenarios.filter((scenario) => kind === "all" || (kind === "negative") === isNegativeScenario(scenario));
   return <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3">
-    <div className="mb-2 flex items-center justify-between"><p className="text-xs font-semibold text-slate-700">{t.generated}</p><Badge size="1" variant="surface" color="gray">{t.cases(caseSelection[selected.id] ? `${activeCases.length}/${scenarios.length}` : scenarios.length)}</Badge></div>
+    <div className="mb-2 flex flex-wrap items-center justify-between gap-2"><p className="text-xs font-semibold text-slate-700">{t.generated}</p><div className="flex items-center gap-2">{negatives > 0 && <SegmentedControl.Root size="1" aria-label={t.kinds} value={kind} onValueChange={(value) => setKind(value as typeof kind)}><SegmentedControl.Item value="all">{t.kindAll(scenarios.length)}</SegmentedControl.Item><SegmentedControl.Item value="functional">{t.kindFunctional(scenarios.length - negatives)}</SegmentedControl.Item><SegmentedControl.Item value="negative">{t.kindNegative(negatives)}</SegmentedControl.Item></SegmentedControl.Root>}{negatives > 0 && <InfoTip id="negativeCases"/>}<Badge size="1" variant="surface" color="gray">{t.cases(caseSelection[selected.id] ? `${activeCases.length}/${scenarios.length}` : scenarios.length)}</Badge></div></div>
     <div className="flex gap-2 overflow-x-auto pb-2">
       <button onClick={() => bench.selectAllScenarios(hasResult())} disabled={busy} className={cn("flex shrink-0 items-center gap-2 rounded-lg border bg-panel px-3 py-2 text-left text-[11px] transition-colors", !selectedScenario ? "border-accent-8 ring-2 ring-accent-4" : "border-slate-200 hover:border-slate-300")}><span className="size-2 rounded-full bg-slate-400"/><span><span className="block font-medium text-slate-700">{t.allCases}</span><span className="text-slate-400">{t.tests(activeCases.length)}</span></span></button>
-      {scenarios.map((scenario) => {
+      {shown.map((scenario) => {
         const state = operationStates[`${selected.id}:${scenario.id}`];
         const included = activeCases.some((item) => item.id === scenario.id);
         return <div key={scenario.id} className={cn("flex shrink-0 items-center gap-2 rounded-lg border bg-panel pl-2.5 transition-colors", selectedScenario?.id === scenario.id ? "border-accent-8 ring-2 ring-accent-4" : "border-slate-200 hover:border-slate-300", !included && "opacity-60")}>
           <Checkbox size="1" aria-label={t.include(scenario.name)} checked={included} disabled={busy} onCheckedChange={() => bench.toggleCase(selected, scenario.id)} className="shrink-0"/>
-          <button onClick={() => bench.selectScenario(scenario, hasResult(scenario.id))} disabled={busy} className="flex items-center gap-2 py-2 pr-3 text-left text-[11px]"><span className={cn("size-2 rounded-full", state ? DOT[state] : "bg-slate-200")}/><span><span className="block font-medium text-slate-700">{scenario.name}</span><span className="text-slate-400">{t.expects(scenario.expectedStatus)}</span></span></button>
+          <button onClick={() => bench.selectScenario(scenario, hasResult(scenario.id))} disabled={busy} className="flex items-center gap-2 py-2 pr-3 text-left text-[11px]"><span className={cn("size-2 rounded-full", state ? DOT[state] : "bg-slate-200")}/><span><span className="block font-medium text-slate-700">{scenario.name}</span><span className="text-slate-400">{t.expects(scenario.expectedStatuses?.join("/") ?? scenario.expectedStatus)}{isNegativeScenario(scenario) && <span className="ml-1.5 font-medium text-amber-600">· {t.negative}</span>}</span></span></button>
         </div>;
       })}
     </div>

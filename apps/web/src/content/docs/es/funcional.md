@@ -1,12 +1,12 @@
 # Verificación funcional
 
-La verificación funcional comprueba que cada operación responde **lo que su contrato dice**, incluidos los casos que casi nadie prueba: el 404 de una escritura, el 409 de una clave duplicada, el 422 de un body vacío y el 401/403 de cada operación protegida. Un 200 no es una prueba que pasa.
+La verificación funcional comprueba que cada operación responde **lo que su contrato dice**, incluidos los casos que casi nadie prueba: el 404 de una escritura, el 409 de una clave duplicada, el 422 de un body vacío, el 4xx de cada entrada que el schema rechaza y el 401/403 de cada operación protegida. Un 200 no es una prueba que pasa.
 
 ## Qué comprueba cada caso
 
 Toda solicitud se evalúa con las mismas aserciones:
 
-- **Status**: el esperado por el caso. Un 405 se reporta como «operación no implementada».
+- **Status**: el esperado por el caso (en un caso negativo, cualquiera de los 4xx que acepta). Un 405 se reporta como «operación no implementada».
 - **Schema OpenAPI**: el cuerpo se valida contra el schema que el contrato declara para ese status. Si no declara ninguno, se verifica la forma (el envelope `{ data }`, por ejemplo).
 - **Content-Type**: JSON cuando hay cuerpo.
 - **Latencia**: solo si una regla de presupuesto cubre la operación. Ver [Conceptos](doc:conceptos).
@@ -26,6 +26,30 @@ El tipo de operación se deduce del método y la ruta (un GET que termina en `{i
 | Borrado (`DELETE`) | Crear, eliminar y confirmar (204); consultar el recurso eliminado (404 en el GET y en un segundo DELETE). |
 
 Los 404 y 422 de escritura solo se generan si el contrato declara ese status para la operación.
+
+## Casos negativos
+
+Además, cada operación que recibe un body o parámetros recibe **casos negativos**: entrada que su contrato declara inválida, con **un solo fallo por caso** sobre su body válido (`bodies`), para que lo que se prueba sea solo ese fallo. Se generan de `requestSchemas`, que la importación de OpenAPI rellena con el schema del body y de cada parámetro.
+
+| Tipo | Qué envía | id |
+| --- | --- | --- |
+| `malformed` | Un body que no es JSON (el válido, cortado antes de cerrar) | `negative-body-malformed` |
+| `missing` | Sin un campo requerido | `negative-body-missing-sku` |
+| `type` | Un tipo incorrecto (un número donde va un string, `abc` donde va un entero…) | `negative-body-type-price`, `negative-query-type-limit`, `negative-path-type-order_id` |
+| `null` | `null` en un campo que no es nullable | `negative-body-null-name` |
+| `min-length`, `max-length` | Un string más corto que `minLength` o más largo que `maxLength` | `negative-body-max-length-sku` |
+| `minimum`, `maximum` | Un número fuera de `minimum`/`maximum` (o de sus versiones exclusivas) | `negative-query-maximum-limit` |
+| `enum` | Un valor fuera del `enum` | `negative-query-enum-sort` |
+| `format` | Un `email`, `uuid`, `date`, `date-time` o `uri` inválido | `negative-body-format-email` |
+| `extra` | Un campo no declarado, si el schema tiene `additionalProperties: false` | `negative-body-extra` |
+
+- **Pasa** con cualquier 4xx que la operación declare, salvo 401, 403, 405, 409 y 429 (no son un veredicto sobre la entrada); si no declara ninguno, con 400 o 422. `negativeCases.statuses` lo fija a mano.
+- **Falla** con un 2xx (la API aceptó la entrada inválida) y siempre con un 5xx (se rompió con ella): la aserción de status lo dice con esas palabras.
+- **Limpieza**: un POST que acepta la entrada inválida creó algo, y se borra. Un PUT o PATCH corre sobre una fila temporal (se crea, se envía el caso, se borra), así una entrada aceptada no cambia una fila que lee el resto de la matriz. Un fallo en el id de la ruta se envía tal cual.
+- **Acotados y deterministas**: como mucho `negativeCases.maxPerOperation` por operación (10 por defecto), tomando un caso de cada tipo, en el orden de la tabla, antes de un segundo de cualquiera. La misma entrada genera siempre los mismos casos.
+- Son escrituras cuando la operación lo es: en un entorno sin escrituras quedan **bloqueados**, no fallidos, y siguen el orden seguro (lecturas primero, borrados al final).
+
+En la app, los casos negativos llevan la marca «negativo» y se filtran en la lista de casos del endpoint y en los casos de una ejecución. Se configuran en [`negativeCases`](doc:formato).
 
 ## La matriz de autenticación
 

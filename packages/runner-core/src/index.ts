@@ -1,6 +1,7 @@
 export * from "./types.ts";
 export * from "./project.ts";
 export * from "./scenarios.ts";
+export * from "./negative.ts";
 export * from "./execution-plan.ts";
 export * from "./scenario-runner.ts";
 export { budgetFor, matchBudgetRule, percentile, latencyAssertion } from "./budgets.mjs";

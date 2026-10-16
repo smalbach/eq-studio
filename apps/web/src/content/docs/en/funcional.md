@@ -1,12 +1,12 @@
 # Functional verification
 
-Functional verification checks that each operation answers **what its contract says**, including the cases almost nobody tests: the 404 of a write, the 409 of a duplicate key, the 422 of an empty body and the 401/403 of every protected operation. A 200 is not a test that passes.
+Functional verification checks that each operation answers **what its contract says**, including the cases almost nobody tests: the 404 of a write, the 409 of a duplicate key, the 422 of an empty body, the 4xx of every input the schema rejects and the 401/403 of every protected operation. A 200 is not a test that passes.
 
 ## What each case checks
 
 Every request is evaluated with the same assertions:
 
-- **Status**: the one the case expects. A 405 is reported as "operation not implemented".
+- **Status**: the one the case expects (in a negative case, any of the 4xx it accepts). A 405 is reported as "operation not implemented".
 - **OpenAPI schema**: the body is validated against the schema the contract declares for that status. If it declares none, the shape is checked (the `{ data }` envelope, for instance).
 - **Content-Type**: JSON whenever there is a body.
 - **Latency**: only if a budget rule covers the operation. See [Concepts](doc:conceptos).
@@ -26,6 +26,30 @@ The kind of operation follows from its method and path (a GET ending in `{id}` i
 | Delete (`DELETE`) | Create, delete and confirm (204); read the deleted resource (404 on the GET and on a second DELETE). |
 
 The 404 and 422 write cases are only generated when the contract declares that status for the operation.
+
+## Negative cases
+
+On top of that, every operation that takes a body or parameters gets **negative cases**: input its contract declares invalid, with **a single fault per case** over its valid body (`bodies`), so that the fault is the only thing under test. They are generated from `requestSchemas`, which the OpenAPI import fills with the schema of the body and of each parameter.
+
+| Kind | What it sends | id |
+| --- | --- | --- |
+| `malformed` | A body that is not JSON (the valid one, cut short of its closing brace) | `negative-body-malformed` |
+| `missing` | Without a required field | `negative-body-missing-sku` |
+| `type` | A wrong type (a number where a string goes, `abc` where an integer goes…) | `negative-body-type-price`, `negative-query-type-limit`, `negative-path-type-order_id` |
+| `null` | `null` in a field that is not nullable | `negative-body-null-name` |
+| `min-length`, `max-length` | A string shorter than `minLength` or longer than `maxLength` | `negative-body-max-length-sku` |
+| `minimum`, `maximum` | A number outside `minimum`/`maximum` (or their exclusive versions) | `negative-query-maximum-limit` |
+| `enum` | A value not in the `enum` | `negative-query-enum-sort` |
+| `format` | An invalid `email`, `uuid`, `date`, `date-time` or `uri` | `negative-body-format-email` |
+| `extra` | An undeclared field, when the schema has `additionalProperties: false` | `negative-body-extra` |
+
+- **Passes** with any 4xx the operation declares, except 401, 403, 405, 409 and 429 (they are no verdict on the input); if it declares none, with 400 or 422. `negativeCases.statuses` sets them by hand.
+- **Fails** with a 2xx (the API accepted the invalid input) and always with a 5xx (it broke on it): the status assertion says so in those words.
+- **Cleanup**: a POST that accepts the invalid input created something, and it is deleted. A PUT or PATCH runs over a temporary row (created, the case sent, deleted), so accepted input changes no row the rest of the matrix reads. A fault in the path id is sent as it is.
+- **Bounded and deterministic**: at most `negativeCases.maxPerOperation` per operation (10 by default), taking one case of each kind, in the order of the table, before a second of any. The same input always generates the same cases.
+- They are writes when the operation is one: in an environment without writes they are **blocked**, not failed, and they follow the safe order (reads first, deletes last).
+
+In the app, negative cases carry the "negative" tag and can be filtered in the endpoint's case list and in a run's cases. They are configured in [`negativeCases`](doc:formato).
 
 ## The authentication matrix
 

@@ -3,9 +3,11 @@
  *
  * A 200 is not a test that passes. Besides the happy path each operation gets the cases the
  * contract declares and nobody tends to exercise: the 404 of a write, the 409 of a natural key,
- * the 422 of an empty PUT, and the 401/403 of every protected operation.
+ * the 422 of an empty PUT, the 4xx of input the schema rejects, and the 401/403 of every
+ * protected operation.
  */
 import { localized, tr } from "./i18n.mjs";
+import { negativeScenarios } from "./negative.ts";
 import { existingId, fromTemplate, missingId, operationKind, pathParameters } from "./project.ts";
 import type { Endpoint, Locale, ProjectConfig, TestScenario } from "./types.ts";
 
@@ -148,7 +150,7 @@ export function scenariosFor(endpoint: Endpoint, config: ProjectConfig, locale: 
   const extra = (config.extraScenarios?.[endpoint.id] ?? []).map((template) => fromTemplate(template, locale));
   // Deduplicated by id: a detail GET already generates its own `not-found`, and two cases with
   // the same id would overwrite each other's result.
-  const all = [...functionalScenarios(endpoint, config, locale), ...extra, ...writeEdgeScenarios(endpoint, config, locale), ...authScenarios(endpoint, config, locale)];
+  const all = [...functionalScenarios(endpoint, config, locale), ...extra, ...writeEdgeScenarios(endpoint, config, locale), ...negativeScenarios(endpoint, config, locale), ...authScenarios(endpoint, config, locale)];
   return all.filter((scenario, index) => all.findIndex((other) => other.id === scenario.id) === index);
 }
 

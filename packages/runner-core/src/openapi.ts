@@ -8,7 +8,7 @@
  * API without stated budgets gets no latency assertion until someone writes one.
  */
 import { dereference } from "./contract.mjs";
-import type { BudgetRule, GeoPlugin, HttpMethod, IdSource, ParameterSample, ProjectConfig, ProjectOperation } from "./types.ts";
+import type { BudgetRule, GeoPlugin, HttpMethod, IdSource, ParameterSample, ProjectConfig, ProjectOperation, RequestSchemas } from "./types.ts";
 
 type Json = Record<string, unknown>;
 const METHODS = ["get", "post", "put", "patch", "delete"] as const;
@@ -79,6 +79,13 @@ function jsonSchemaOf(content: unknown) {
   return asRecord(json).schema;
 }
 
+/** A schema as the project keeps it: what validates, without the prose. */
+function compactSchema(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(compactSchema);
+  if (!value || typeof value !== "object") return value;
+  return Object.fromEntries(Object.entries(value as Json).filter(([key]) => key !== "description").map(([key, item]) => [key, key === "properties" ? Object.fromEntries(Object.entries(asRecord(item)).map(([name, property]) => [name, compactSchema(property)])) : compactSchema(item)]));
+}
+
 export type ImportedProject = { config: ProjectConfig; warnings: string[] };
 
 export function projectFromOpenApi(input: unknown, options: { name?: string } = {}): ImportedProject {
@@ -93,6 +100,7 @@ export function projectFromOpenApi(input: unknown, options: { name?: string } = 
   const bodies: NonNullable<ProjectConfig["bodies"]> = {};
   const samples: Record<string, ParameterSample[]> = {};
   const publicOperations: string[] = [];
+  const requestSchemas: Record<string, RequestSchemas> = {};
   const seen = new Set<string>();
   const parameterSchemas: Record<string, unknown> = {};
   let envelopeVotes = 0;
@@ -116,6 +124,11 @@ export function projectFromOpenApi(input: unknown, options: { name?: string } = 
       }
       const upper = method.toUpperCase() as HttpMethod;
       operations.push({ id, method: upper, path, summary: String(operation.summary ?? operation.description ?? `${upper} ${path}`).split("\n")[0], tag: Array.isArray(operation.tags) && operation.tags.length ? String(operation.tags[0]) : "default", statuses, parameters: [...new Set(parameters.map((parameter) => String(parameter.name)))] });
+      const inputs: RequestSchemas = {};
+      for (const parameter of parameters) if (parameter.schema) (inputs.parameters ??= {})[String(parameter.name)] = compactSchema(parameter.schema) as Json;
+      const bodySchema = ["post", "put", "patch"].includes(method) ? jsonSchemaOf(asRecord(operation.requestBody).content) : undefined;
+      if (bodySchema) inputs.body = compactSchema(bodySchema) as Json;
+      if (inputs.body || inputs.parameters) requestSchemas[id] = inputs;
       const security = Array.isArray(operation.security) ? operation.security : globalSecurity;
       if (!security.length || security.some((requirement) => Object.keys(asRecord(requirement)).length === 0)) publicOperations.push(id);
       if (["post", "put", "patch"].includes(method)) {
@@ -152,6 +165,7 @@ export function projectFromOpenApi(input: unknown, options: { name?: string } = 
       operations,
       bodies,
       parameterSamples: samples,
+      requestSchemas,
       plugins: { ...(pagination ? { pagination } : {}), ...(geo ? { geo } : {}) },
       auth: { publicOperations },
       budgets,

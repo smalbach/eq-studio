@@ -3,7 +3,8 @@
  *
  * The engine validates every response it receives against this document, so it is written to
  * be exact rather than generous: every status an operation can answer is declared, every
- * resource schema is closed (`additionalProperties: false`) and every required member is listed.
+ * resource and request schema is closed (`additionalProperties: false`) and every required
+ * member is listed. The request schemas are also what the engine's negative cases break.
  * A document that is looser than the API makes schema assertions pass that should fail.
  *
  * It is the same whether the server enforces authentication or not: the contract describes the
@@ -56,7 +57,7 @@ export function openApiDocument() {
       "/v1/products": {
         get: {
           operationId: "listProducts", tags: ["products"], summary: "List products",
-          parameters: [parameter("Limit"), parameter("Cursor"), parameter("Q"), parameter("Category"), parameter("Sku")],
+          parameters: [parameter("Limit"), parameter("Cursor"), parameter("Q"), parameter("Category"), parameter("Sku"), parameter("Sort")],
           responses: { ...listResponses, 200: json(ref("ProductList"), "A page of products.") },
         },
         post: {
@@ -128,7 +129,7 @@ export function openApiDocument() {
         },
         post: {
           operationId: "createStore", tags: ["stores"], summary: "Create a store",
-          requestBody: body("StoreCreate", { store: { name: "Harbour Street", address: "12 Harbour Street", lat: 40.01, lon: -100.01, phone: "+1 555 0100" } }),
+          requestBody: body("StoreCreate", { store: { name: "Harbour Street", address: "12 Harbour Street", lat: 40.01, lon: -100.01, phone: "+1 555 0100", email: "harbour@mock-store.example" } }),
           responses: { 201: json(ref("StoreEnvelope"), "The created store."), 401: response("Unauthorized"), 403: response("Forbidden"), 409: response("Conflict"), 422: response("ValidationError") },
         },
       },
@@ -164,6 +165,7 @@ export function openApiDocument() {
         Cursor: { name: "cursor", in: "query", required: false, description: "Opaque cursor taken from `meta.next_cursor` of the previous page.", schema: { type: "string", example: "eyJvZmZzZXQiOjJ9" } },
         Q: { name: "q", in: "query", required: false, description: "Case-insensitive text search over name and description.", schema: { type: "string", minLength: 1, example: "lamp" } },
         Category: { name: "category", in: "query", required: false, description: "Exact category.", schema: { type: "string", minLength: 1, example: "lighting" } },
+        Sort: { name: "sort", in: "query", required: false, description: "Order: by name, by price, or by price descending (`-price`). By id when absent.", schema: { type: "string", enum: ["name", "price", "-price"], example: "price" } },
         Sku: { name: "sku", in: "query", required: false, description: "Exact SKU: zero or one product.", schema: { type: "string", minLength: 1, example: "SKU-0001" } },
         Lat: { name: "lat", in: "query", required: false, description: "Latitude of the centre. Requires `lon`.", schema: { type: "number", minimum: -90, maximum: 90, example: 40 } },
         Lon: { name: "lon", in: "query", required: false, description: "Longitude of the centre. Requires `lat`.", schema: { type: "number", minimum: -180, maximum: 180, example: -100 } },
@@ -214,6 +216,7 @@ export function openApiDocument() {
             price: { type: "number", minimum: 0, example: 249 },
             stock: { type: "integer", minimum: 0, default: 0 },
           },
+          additionalProperties: false,
         },
         ProductPatch: {
           type: "object", minProperties: 1, description: "At least one writable field.",
@@ -225,10 +228,12 @@ export function openApiDocument() {
             category: { type: "string", minLength: 1, maxLength: 64 },
             stock: { type: "integer", minimum: 0 },
           },
+          additionalProperties: false,
         },
         ProductBulkRequest: {
           type: "object", required: ["records"],
           properties: { records: { type: "array", minItems: 1, maxItems: 100, items: ref("ProductCreate") } },
+          additionalProperties: false,
         },
         ProductEnvelope: { type: "object", required: ["data"], properties: { data: ref("Product") }, additionalProperties: false },
         ProductList: {
@@ -244,7 +249,7 @@ export function openApiDocument() {
         BulkResultEnvelope: { type: "object", required: ["data"], properties: { data: ref("BulkResult") }, additionalProperties: false },
         Store: {
           type: "object",
-          required: ["store_id", "name", "address", "lat", "lon", "phone"],
+          required: ["store_id", "name", "address", "lat", "lon", "phone", "email"],
           properties: {
             store_id: { type: "integer", minimum: 1, readOnly: true },
             name: { type: "string", minLength: 1, maxLength: 120 },
@@ -252,6 +257,7 @@ export function openApiDocument() {
             lat: { type: "number", minimum: -90, maximum: 90 },
             lon: { type: "number", minimum: -180, maximum: 180 },
             phone: { type: ["string", "null"], maxLength: 32 },
+            email: { type: ["string", "null"], format: "email", maxLength: 120 },
             distance_km: { type: "number", minimum: 0, readOnly: true, description: "Only in a geographic search." },
           },
           additionalProperties: false,
@@ -265,7 +271,9 @@ export function openApiDocument() {
             lat: { type: "number", minimum: -90, maximum: 90, example: 40.01 },
             lon: { type: "number", minimum: -180, maximum: 180, example: -100.01 },
             phone: { type: ["string", "null"], maxLength: 32 },
+            email: { type: ["string", "null"], format: "email", maxLength: 120 },
           },
+          additionalProperties: false,
         },
         StorePatch: {
           type: "object", minProperties: 1, description: "At least one writable field.",
@@ -275,7 +283,9 @@ export function openApiDocument() {
             address: { type: "string", minLength: 1, maxLength: 200 },
             lat: { type: "number", minimum: -90, maximum: 90 },
             lon: { type: "number", minimum: -180, maximum: 180 },
+            email: { type: ["string", "null"], format: "email", maxLength: 120 },
           },
+          additionalProperties: false,
         },
         StoreEnvelope: { type: "object", required: ["data"], properties: { data: ref("Store") }, additionalProperties: false },
         StoreList: {
@@ -305,6 +315,7 @@ export function openApiDocument() {
             comment: { type: "string", maxLength: 2000, default: "" },
             store_id: { type: ["integer", "null"], minimum: 1, description: "Must be an existing store." },
           },
+          additionalProperties: false,
         },
         ReviewEnvelope: { type: "object", required: ["data"], properties: { data: ref("Review") }, additionalProperties: false },
         ReviewList: {

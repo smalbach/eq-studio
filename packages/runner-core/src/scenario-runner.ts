@@ -7,7 +7,7 @@
  * The envelope member, the id fallback and the bulk lookups come from the project.
  */
 import { tr } from "./i18n.mjs";
-import { dataKey as dataKeyOf } from "./project.ts";
+import { dataKey as dataKeyOf, existingId } from "./project.ts";
 import type { Endpoint, Locale, ProjectConfig, TestScenario } from "./types.ts";
 
 export type StepResult = {
@@ -142,9 +142,10 @@ export function createScenarioRunner<R extends StepResult>(endpoints: Endpoint[]
   /**
    * A case that needs a row that exists. Over the seed's id when the environment has rows; when
    * it has none, over a temporary row created through the collection's POST and deleted at the
-   * end — the case is the same, only where its row comes from changes.
+   * end — the case is the same, only where its row comes from changes. `isolated` takes the
+   * temporary row even when the environment has rows: for a case that may change the one it hits.
    */
-  async function runOverExisting(item: Endpoint, scenario: TestScenario, steps: R[], initialParameters: Record<string, string>, useEditorBody: boolean) {
+  async function runOverExisting(item: Endpoint, scenario: TestScenario, steps: R[], initialParameters: Record<string, string>, useEditorBody: boolean, isolated = false) {
     const idField = [...item.path.matchAll(/\{([^}]+)\}/g)].at(-1)?.[1];
     const collectionPath = item.path.replace(/\/\{[^}]+\}$/, "");
     const createEndpoint = endpoints.find((candidate) => candidate.method === "POST" && candidate.path === collectionPath);
@@ -153,13 +154,15 @@ export function createScenarioRunner<R extends StepResult>(endpoints: Endpoint[]
     // with the case's own parameters, so an unchanged one is still the case's seed id.
     const typed = initialParameters[idField ?? ""];
     const chosen = Boolean(typed) && typed !== scenario.parameters?.[idField ?? ""];
-    if (!idField || hasRows(idField) || chosen || !createEndpoint || !readEndpoint) {
+    if (!idField || (!isolated && hasRows(idField)) || chosen || !createEndpoint || !readEndpoint) {
       steps.push(await execute(item, scenario, initialParameters, { useEditorBody }));
       return;
     }
-    const createScenario: TestScenario = { id: "setup-create", name: t("Preparar entidad", "Prepare entity"), description: t("El entorno no tiene filas de este recurso", "The environment has no rows of this resource"), expectedStatus: createEndpoint.statuses.includes(201) ? 201 : 200, body: createEndpoint.body, flow: "request" };
+    const createScenario: TestScenario = { id: "setup-create", name: t("Preparar entidad", "Prepare entity"), description: isolated ? t("Una fila propia del caso", "A row of the case's own") : t("El entorno no tiene filas de este recurso", "The environment has no rows of this resource"), expectedStatus: createEndpoint.statuses.includes(201) ? 201 : 200, body: createEndpoint.body, flow: "request" };
     const created = await execute(createEndpoint, createScenario);
-    created.step = t("Preparación: el entorno no tiene filas de este recurso, crea una temporal", "Setup: the environment has no rows of this resource, creates a temporary one");
+    created.step = isolated
+      ? t("Preparación: crea una fila temporal, para que una entrada inválida aceptada no cambie una existente", "Setup: creates a temporary row, so invalid input that is accepted changes no existing one")
+      : t("Preparación: el entorno no tiene filas de este recurso, crea una temporal", "Setup: the environment has no rows of this resource, creates a temporary one");
     steps.push(created);
     const captured = idFrom(created, readEndpoint);
     const capturedOk = Boolean(captured?.value);
@@ -175,12 +178,38 @@ export function createScenarioRunner<R extends StepResult>(endpoints: Endpoint[]
     const cleanup = await deleteCreated(readEndpoint, captured);
     if (cleanup) { cleanup.step = t("Limpieza: borra la fila temporal", "Cleanup: deletes the temporary row"); steps.push(cleanup); }
   }
+  /**
+   * A negative case: one request with bad input that must come back 4xx. A PUT or PATCH sends
+   * it over a temporary row, so an API that wrongly accepts it changes a row of the case's own
+   * and not one the rest of the matrix reads. A POST that wrongly accepts it has created
+   * something, and that is deleted.
+   */
+  async function runNegative(item: Endpoint, scenario: TestScenario, steps: R[], initialParameters: Record<string, string>, useEditorBody: boolean) {
+    const idField = [...item.path.matchAll(/\{([^}]+)\}/g)].at(-1)?.[1];
+    // A fault in the id itself is sent as it is: there is no row to isolate.
+    const overExisting = Boolean(idField) && (scenario.parameters?.[idField ?? ""] ?? existingId(config)) === existingId(config);
+    if (["PUT", "PATCH"].includes(item.method) && overExisting) {
+      await runOverExisting(item, scenario, steps, initialParameters, useEditorBody, true);
+      return;
+    }
+    const result = await execute(item, scenario, initialParameters, { useEditorBody });
+    steps.push(result);
+    const status = result.actual?.status ?? 0;
+    const detail = item.method === "POST" && status >= 200 && status < 300 ? detailEndpointFor(item) : undefined;
+    const captured = detail ? idFrom(result, detail) : undefined;
+    if (detail && captured?.value) {
+      const cleanup = await deleteCreated(detail, captured);
+      if (cleanup) { cleanup.step = t("Limpieza: la API aceptó la entrada inválida y creó un recurso; se borra", "Cleanup: the API accepted the invalid input and created a resource; it is deleted"); steps.push(cleanup); }
+    }
+  }
   async function runScenario(item: Endpoint, scenario: TestScenario, initialParameters: Record<string, string> = {}, useEditorBody = false): Promise<{ ok: boolean; durationMs: number; steps: R[] }> {
     const steps: R[] = [];
     if (scenario.flow === "request") {
       steps.push(await execute(item, scenario, initialParameters, { useEditorBody }));
     } else if (scenario.flow === "existing") {
       await runOverExisting(item, scenario, steps, initialParameters, useEditorBody);
+    } else if (scenario.flow === "negative") {
+      await runNegative(item, scenario, steps, initialParameters, useEditorBody);
     } else if (scenario.flow === "bulk-read" && bulkLookups[item.path]) {
       await runBulk(item, scenario, steps, useEditorBody);
     } else if (scenario.flow === "bulk-read") {

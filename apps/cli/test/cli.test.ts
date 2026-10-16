@@ -54,10 +54,10 @@ test("a project file runs with no server: exit 0, a summary and a JUnit report",
   const result = await eq(["run", "--file", example, "--env", "local", "--base-url", mockUrl, "--junit", junit]);
   assert.equal(result.code, 0, result.stderr);
   assert.match(result.stdout, /Full matrix · Local · PASSED/);
-  assert.match(result.stdout, /69 passed · 0 failed/);
+  assert.match(result.stdout, /181 passed · 0 failed/);
   const xml = readFileSync(junit, "utf8");
-  assert.match(xml, /<testsuites name="mock-store · Local · Full matrix" tests="69" failures="0"/);
-  assert.equal((xml.match(/<testcase /g) ?? []).length, 69);
+  assert.match(xml, /<testsuites name="mock-store · Local · Full matrix" tests="181" failures="0"/);
+  assert.equal((xml.match(/<testcase /g) ?? []).length, 181);
 });
 
 test("failing cases exit 1 and name what failed", async () => {
