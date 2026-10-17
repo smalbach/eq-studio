@@ -60,7 +60,9 @@ for (const database of databases()) {
 
     /** A new environment of the mock with auth on, its three credentials set, and a full run. */
     async function runWith(key: string, baseUrl: string, credentials: Record<string, object>) {
-      const created = await h.request("POST", "/v1/projects/mock-store/environments", { key, name: key, baseUrl, authEnabled: true });
+      // What is under test is authentication: a cold TLS handshake on a slow runner must not fail a
+      // case on the example's latency budgets.
+      const created = await h.request("POST", "/v1/projects/mock-store/environments", { key, name: key, baseUrl, authEnabled: true, enforceLatency: false });
       assert.equal(created.status, 201, JSON.stringify(created.body));
       for (const [role, body] of Object.entries(credentials)) {
         const saved = await h.request("PUT", `/v1/projects/mock-store/environments/${key}/credentials/${role}`, body);
