@@ -10,7 +10,13 @@ import { createMockServer } from "../../mock-target/server.mjs";
 import { databases, start, waitFor, type Harness } from "./helpers.ts";
 
 const example = JSON.parse(readFileSync(new URL("../../../examples/mock-store/mock-store.eq.json", import.meta.url), "utf8"));
-const failures = (run: { cases: { status: string; operationId: string; scenarioId: string }[] }) => run.cases.filter((item) => item.status !== "passed").map((item) => `${item.operationId}:${item.scenarioId}=${item.status}`);
+type Step = { request: { url: string }; actual: null | { status: number }; assertions: { pass: boolean; label: string; detail: string }[] };
+/** Each case that did not pass, with the first assertion it failed, so a CI log says why. */
+const failures = (run: { cases: { status: string; operationId: string; scenarioId: string; steps?: Step[] }[] }) => run.cases.filter((item) => item.status !== "passed").map((item) => {
+  const step = item.steps?.find((candidate) => candidate.assertions.some((assertion) => !assertion.pass));
+  const failed = step?.assertions.find((assertion) => !assertion.pass);
+  return `${item.operationId}:${item.scenarioId}=${item.status}${failed ? ` (${step!.actual?.status ?? "no response"}: ${failed.label}: ${failed.detail})` : ""}`;
+});
 
 const hasOpenssl = (() => { try { execFileSync("openssl", ["version"], { stdio: "ignore", timeout: 10_000 }); return true; } catch { return false; } })();
 const PASSPHRASE = "client-key-passphrase";
@@ -62,7 +68,8 @@ for (const database of databases()) {
       }
       const started = await h.request("POST", "/v1/projects/mock-store/runs", { environment: key });
       assert.equal(started.status, 202, JSON.stringify(started.body));
-      return waitFor(h, started.body.id);
+      await waitFor(h, started.body.id);
+      return (await h.request("GET", `/v1/runs/${started.body.id}?steps=true`)).body;
     }
 
     const apiKey = { kind: "api_key", secret: "demo-key", headerName: "X-API-Key" };
