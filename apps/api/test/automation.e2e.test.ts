@@ -143,8 +143,13 @@ async function receiver(status = 200) {
     request.on("end", () => { requests.push({ headers: request.headers, body }); response.statusCode = status; response.end(); });
   });
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
-  return { url: `http://127.0.0.1:${(server.address() as { port: number }).port}/hook`, requests, close: () => new Promise((resolve) => server.close(resolve)) };
+  const close = () => new Promise<void>((resolve) => { server.close(() => resolve()); server.closeAllConnections(); });
+  receivers.add(close);
+  return { url: `http://127.0.0.1:${(server.address() as { port: number }).port}/hook`, requests, close };
 }
+/** Every receiver still open, closed after its suite even when a test fails before closing it. */
+const receivers = new Set<() => Promise<void>>();
+after(async () => { await Promise.all([...receivers].map((close) => close())); });
 
 for (const database of databases()) {
   describe(`schedules and notifications over ${database.name}`, () => {
@@ -205,7 +210,9 @@ for (const database of databases()) {
         const [mine, theirs] = await Promise.all([first.tick(), other.tick()]);
         assert.equal(mine + theirs, 1, `round ${round}: ${mine} + ${theirs}`);
       }
-      assert.equal((await runsOf(created.body.id)).length, 3);
+      const runs = await runsOf(created.body.id);
+      assert.equal(runs.length, 3);
+      for (const run of runs) await waitFor(h, run.id);
     });
 
     test("an occurrence is skipped while the schedule's previous run is still going", async () => {
@@ -237,8 +244,9 @@ for (const database of databases()) {
       const started = await h.request("POST", "/v1/projects/mock-store/runs", { environment: "local", readOnly: true });
       await waitFor(h, started.body.id);
       await h.app.get(RunFinishedNotifier).idle();
-      assert.equal(hook.requests.length, 1);
-      const [delivery] = hook.requests;
+      const deliveries = hook.requests.filter((item) => (JSON.parse(item.body) as RunPayload).run.id === started.body.id);
+      assert.equal(deliveries.length, 1);
+      const [delivery] = deliveries;
       assert.equal(delivery.headers["content-type"], "application/json");
       assert.equal(delivery.headers["x-eq-event"], "run.finished");
       const timestamp = Number(delivery.headers["x-eq-timestamp"]);
@@ -254,7 +262,7 @@ for (const database of databases()) {
 
       const tested = await h.request("POST", `/v1/projects/mock-store/notifications/${created.body.id}/test`);
       assert.deepEqual(tested.body, { ok: true, status: 200, error: null });
-      assert.equal(JSON.parse(hook.requests[1].body).test, true);
+      assert.equal(JSON.parse(hook.requests.at(-1)!.body).test, true);
       const after = (await h.request("GET", "/v1/projects/mock-store/notifications")).body.targets.find((item: { id: string }) => item.id === created.body.id);
       assert.equal(after.lastStatus, "ok");
       assert.equal((await h.request("DELETE", `/v1/projects/mock-store/notifications/${created.body.id}`)).status, 204);

@@ -22,7 +22,9 @@ export type Harness = { app: INestApplication; base: string; mock: string; reque
 
 /** A test configuration: a random secrets key, the in-memory queue unless told otherwise. */
 export function testConfig(database: DatabaseConfig, queue: AppConfig["queue"] = { driver: "memory", concurrency: 2 }, cloud?: { allowPrivateTargets: boolean; registration?: "open" | "invite" }): AppConfig {
-  const base: AppConfig = { mode: "local", host: "127.0.0.1", port: 0, database, secrets: { type: "key", key: randomBytes(32).toString("base64") }, queue, examplesDir: DEFAULT_EXAMPLES_DIR };
+  // No scheduler timer: tests call `tick()` themselves, and a tick on its own would fire the
+  // schedules an earlier test left behind in the middle of a later one.
+  const base: AppConfig = { mode: "local", host: "127.0.0.1", port: 0, database, secrets: { type: "key", key: randomBytes(32).toString("base64") }, queue, examplesDir: DEFAULT_EXAMPLES_DIR, scheduler: { tickSeconds: 0 } };
   if (!cloud) return base;
   return { ...base, mode: "cloud", auth: { required: true, jwtSecret: randomBytes(48).toString("base64"), registration: cloud.registration ?? "invite", accessTtlSeconds: 900, refreshTtlDays: 30 }, network: { allowPrivateTargets: cloud.allowPrivateTargets, corsOrigins: [] } };
 }
