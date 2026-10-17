@@ -24,7 +24,7 @@
     "reflect-metadata": "0.2.2",
     "rxjs": "7.8.2",
     "sql.js": "1.13.0",
-    "typeorm": "0.3.31",
+    "typeorm": "1.1.2",
     "undici": "7.16.0",
     "yaml": "2.8.1",
     "zod": "4.6.7"
