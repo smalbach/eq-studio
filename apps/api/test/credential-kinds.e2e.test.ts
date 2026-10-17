@@ -12,7 +12,7 @@ import { databases, start, waitFor, type Harness } from "./helpers.ts";
 const example = JSON.parse(readFileSync(new URL("../../../examples/mock-store/mock-store.eq.json", import.meta.url), "utf8"));
 const failures = (run: { cases: { status: string; operationId: string; scenarioId: string }[] }) => run.cases.filter((item) => item.status !== "passed").map((item) => `${item.operationId}:${item.scenarioId}=${item.status}`);
 
-const hasOpenssl = (() => { try { execFileSync("openssl", ["version"], { stdio: "ignore" }); return true; } catch { return false; } })();
+const hasOpenssl = (() => { try { execFileSync("openssl", ["version"], { stdio: "ignore", timeout: 10_000 }); return true; } catch { return false; } })();
 const PASSPHRASE = "client-key-passphrase";
 
 /**
@@ -22,7 +22,9 @@ const PASSPHRASE = "client-key-passphrase";
  */
 function generatePki() {
   const dir = mkdtempSync(join(tmpdir(), "eq-mtls-"));
-  const run = (...args: string[]) => execFileSync("openssl", args, { cwd: dir, stdio: "pipe" });
+  // Git for Windows' openssl rewrites `/CN=…` into a path and then prompts for the subject on
+  // stdin: no path conversion, no stdin, and a timeout, so a bad call fails instead of hanging.
+  const run = (...args: string[]) => execFileSync("openssl", args, { cwd: dir, stdio: ["ignore", "pipe", "pipe"], timeout: 30_000, env: { ...process.env, MSYS_NO_PATHCONV: "1", MSYS2_ARG_CONV_EXCL: "*" } });
   const file = (name: string) => readFileSync(join(dir, name), "utf8");
   try {
     run("req", "-x509", "-newkey", "rsa:2048", "-nodes", "-keyout", "ca.key", "-out", "ca.crt", "-subj", "/CN=EQ Test CA", "-days", "1");

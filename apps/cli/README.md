@@ -23,6 +23,15 @@ npx endpoint-quality run --file project.eq.json --env staging \
 npx endpoint-quality load --file project.eq.json --env staging --type load --rps 20 --duration 60 --p95 500
 ```
 
+`--html report.html` and `--sarif report.sarif` add a self-contained HTML report and a SARIF file
+for GitHub code scanning; `report` renders them again from a stored run. `diff` compares two
+contracts and exits 1 when the new one breaks clients:
+
+```bash
+npx endpoint-quality report run.json --format html -o report.html
+npx endpoint-quality diff https://api.example.com/openapi.json openapi.yaml
+```
+
 The same projects on several machines, through a cloud workspace (deployed with the
 `docker/compose.yml` of the repository):
 

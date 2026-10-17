@@ -80,7 +80,10 @@ npx endpoint-quality run --file proyecto.eq.json --env staging \
 El `.eq.json` sale de **Exportar** en la app o de `eq export <proyecto> -o archivo.eq.json`.
 `eq run` sale con `0` si todo pasó, `1` si algún caso falló, `2` si el comando estaba mal y `3` si
 no pudo correr. Hay binarios de un solo archivo (sin Node) para macOS, Windows y Linux en cada
-release. Detalles en [`apps/cli`](apps/cli/README.md) y en la documentación de la app (CLI y CI).
+release. `--html` y `--sarif` escriben además un informe HTML autocontenido y un SARIF que GitHub
+muestra junto al contrato; `eq report` los regenera de una corrida guardada, y `eq diff viejo.yaml
+nuevo.yaml` sale con `1` si el contrato nuevo rompe clientes. Detalles en
+[`apps/cli`](apps/cli/README.md) y en la documentación de la app (CLI y CI).
 
 ## En la nube, para un equipo
 
@@ -128,6 +131,29 @@ También desde la app: **Ajustes → Sincronización**. Detalles en la documenta
 5. Empieza por **Matriz GET**. La matriz completa escribe y borra datos.
 
 Cada proyecto se puede exportar como `.eq.json` e importar en otro equipo o navegador.
+
+## Más allá de la matriz
+
+- **Contratos**: OpenAPI 3.0 y 3.1, Swagger 2.0 (convertido a OpenAPI 3.0) y colecciones de
+  Postman (con schemas inferidos de sus ejemplos). Entre dos versiones del contrato se ve qué
+  cambió y qué rompe clientes.
+- **Casos negativos**: de los schemas de entrada salen casos con una sola falta cada uno (campo
+  que falta, tipo equivocado, fuera de rango, enum, formato…). Pasan con un 4xx y fallan con un
+  2xx o un 5xx.
+- **Credenciales**: bearer, API key, basic, OAuth2 (client credentials y authorization code con
+  refresh token), cookie (pegada o por login), firma HMAC y certificado de cliente (mTLS). Todas
+  cifradas y nunca devueltas.
+- **Informes**: HTML autocontenido, SARIF 2.1.0 y JUnit, sin secretos, desde la CLI, el API o la
+  vista de la corrida.
+- **Programaciones y notificaciones**: corridas funcionales o de carga cada hora, cada día, cada
+  semana o con una expresión cron, y avisos al terminar por webhook (firmado con HMAC), Slack o
+  email.
+- **Operación en la nube**: restablecer contraseña por email, inicio de sesión con cualquier
+  proveedor OpenID Connect, registro de auditoría de solo inserción y métricas Prometheus en
+  `/metrics`. El correo sale de un único SMTP (`EQ_SMTP_URL`).
+
+Cada punto está documentado en la app (Conceptos, Verificación funcional, CLI y CI, Programaciones y
+notificaciones, Despliegue en la nube).
 
 ## Configuración de un proyecto
 
@@ -239,7 +265,10 @@ npx endpoint-quality run --file project.eq.json --env staging \
 
 The `.eq.json` comes from **Export** in the app or `eq export <project> -o file.eq.json`. Exit codes:
 `0` passed, `1` cases failed, `2` wrong command, project or environment, `3` could not run.
-`eq load` runs load, stress, spike and soak tests the same way. See [`apps/cli`](apps/cli/README.md).
+`eq load` runs load, stress, spike and soak tests the same way. `--html` and `--sarif` also write a
+self-contained HTML report and a SARIF file GitHub shows next to the contract; `eq report` renders
+them again from a stored run, and `eq diff old.yaml new.yaml` exits `1` when the new contract breaks
+clients. See [`apps/cli`](apps/cli/README.md).
 
 ### In the cloud, for a team
 
@@ -256,6 +285,24 @@ with SSRF guards. See the in-app docs (Cloud deployment) and [`apps/api`](apps/a
 `eq login <url>` and `eq sync` (or Settings → Sync) link a local installation to a cloud workspace:
 field-by-field merges, visible conflicts, and secrets that stay on each machine unless a passphrase
 encrypts them end to end.
+
+### Beyond the matrix
+
+- **Contracts**: OpenAPI 3.0 and 3.1, Swagger 2.0 (converted to OpenAPI 3.0) and Postman
+  collections (schemas inferred from their examples), with a diff between versions that calls out
+  breaking changes.
+- **Negative cases** from the request schemas, one fault per case: passing on a 4xx, failing on a
+  2xx or 5xx.
+- **Credentials**: bearer, API key, basic, OAuth2 (client credentials, and authorization code with a
+  refresh token), cookie (pasted or by login), HMAC signing and client certificates (mTLS), all
+  encrypted and never read back.
+- **Reports**: self-contained HTML, SARIF 2.1.0 and JUnit, with secrets masked.
+- **Schedules and notifications**: functional or load runs hourly, daily, weekly or on a cron
+  expression, and a webhook (HMAC-signed), Slack or email message when a run finishes.
+- **Cloud operations**: password reset by email, OpenID Connect single sign-on, an append-only audit
+  log and Prometheus metrics at `/metrics`. Email goes through one SMTP setting (`EQ_SMTP_URL`).
+
+Each one is documented in the in-app docs.
 
 ### Contributing
 
