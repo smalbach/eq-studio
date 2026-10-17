@@ -1,0 +1,22 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="128" y1="96" x2="896" y2="928" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#1FC092"/>
+      <stop offset="1" stop-color="#0A6650"/>
+    </linearGradient>
+    <linearGradient id="shine" x1="512" y1="64" x2="512" y2="560" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.18"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <rect x="64" y="64" width="896" height="896" rx="200" fill="url(#bg)"/>
+  <rect x="64" y="64" width="896" height="896" rx="200" fill="url(#shine)"/>
+  <!-- Contract frame: the brackets of a request/response -->
+  <path d="M268 252H220C196 252 180 268 180 292V732C180 756 196 772 220 772H268" stroke="#FFFFFF" stroke-opacity="0.3" stroke-width="40" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M756 252H804C828 252 844 268 844 292V732C844 756 828 772 804 772H756" stroke="#FFFFFF" stroke-opacity="0.3" stroke-width="40" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Signal under load that resolves into a check -->
+  <path d="M300 540H336L382 440L438 640L476 540H548L616 608L780 420" stroke="#FFFFFF" stroke-width="54" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- The endpoint the signal leaves from -->
+  <circle cx="272" cy="540" r="44" fill="#FFFFFF"/>
+  <circle cx="272" cy="540" r="18" fill="#0F8A6A"/>
+</svg>

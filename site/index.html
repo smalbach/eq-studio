@@ -1,0 +1,547 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Endpoint Quality</title>
+  <meta name="description" content="Verifica cualquier API HTTP contra su contrato OpenAPI: status, schema, autenticación, persistencia y flujos encadenados. Además carga, estrés, pico y resistencia. App de escritorio para Windows, macOS y Linux.">
+  <meta property="og:title" content="Endpoint Quality">
+  <meta property="og:description" content="Un 200 no es un test que pasa. Verifica tu API contra su contrato OpenAPI.">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #f7faf9;
+      --bg-alt: #ffffff;
+      --surface: #ffffff;
+      --border: #dbe5e1;
+      --text: #0e1a16;
+      --muted: #52625c;
+      --accent: #0f8a6a;
+      --accent-strong: #0a6650;
+      --accent-bright: #1fc092;
+      --accent-soft: #e3f5ee;
+      --on-accent: #ffffff;
+      --ok: #15936e;
+      --fail: #c8413a;
+      --warn: #b7791f;
+      --term-bg: #0c1613;
+      --term-text: #d6e6e0;
+      --shadow: 0 1px 2px rgb(14 26 22 / 6%), 0 8px 24px rgb(14 26 22 / 6%);
+      color-scheme: light;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root:not([data-theme="light"]) {
+        --bg: #08110e;
+        --bg-alt: #0c1714;
+        --surface: #101d19;
+        --border: #1f322c;
+        --text: #e6f0ec;
+        --muted: #92a69f;
+        --accent: #2fd0a1;
+        --accent-strong: #1fc092;
+        --accent-bright: #4fe0b5;
+        --accent-soft: #10352a;
+        --on-accent: #04120d;
+        --ok: #2fd0a1;
+        --fail: #f0706a;
+        --warn: #e3a94a;
+        --term-bg: #050c0a;
+        --shadow: 0 1px 2px rgb(0 0 0 / 30%), 0 8px 24px rgb(0 0 0 / 30%);
+        color-scheme: dark;
+      }
+    }
+    :root[data-theme="dark"] {
+      --bg: #08110e;
+      --bg-alt: #0c1714;
+      --surface: #101d19;
+      --border: #1f322c;
+      --text: #e6f0ec;
+      --muted: #92a69f;
+      --accent: #2fd0a1;
+      --accent-strong: #1fc092;
+      --accent-bright: #4fe0b5;
+      --accent-soft: #10352a;
+      --on-accent: #04120d;
+      --ok: #2fd0a1;
+      --fail: #f0706a;
+      --warn: #e3a94a;
+      --term-bg: #050c0a;
+      --shadow: 0 1px 2px rgb(0 0 0 / 30%), 0 8px 24px rgb(0 0 0 / 30%);
+      color-scheme: dark;
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font: 16px/1.6 Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+    a { color: var(--accent); }
+    code, pre, .mono { font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace; }
+    .wrap { max-width: 1120px; margin: 0 auto; padding: 0 16px; }
+    @media (min-width: 720px) { .wrap { padding: 0 32px; } }
+
+    /* Nav */
+    header.nav {
+      position: sticky; top: 0; z-index: 10;
+      background: color-mix(in srgb, var(--bg) 85%, transparent);
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid var(--border);
+    }
+    .nav .wrap { display: flex; align-items: center; gap: 24px; height: 60px; }
+    .brand { display: flex; align-items: center; gap: 10px; white-space: nowrap; font-weight: 700; color: var(--text); text-decoration: none; }
+    .brand img { width: 28px; height: 28px; }
+    .nav-links { display: none; gap: 22px; margin-left: auto; }
+    .nav-links a { color: var(--muted); text-decoration: none; font-size: 14px; font-weight: 500; }
+    .nav-links a:hover { color: var(--text); }
+    .nav .gh { margin-left: auto; }
+    @media (min-width: 760px) { .nav-links { display: flex; } .nav .gh { margin-left: 0; } }
+
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 10px;
+      padding: 12px 20px; border-radius: 10px; font-weight: 600; font-size: 15px;
+      text-decoration: none; border: 1px solid transparent; cursor: pointer; transition: transform .15s, background .15s;
+    }
+    .btn:hover { transform: translateY(-1px); }
+    .btn-primary { background: var(--accent-strong); color: var(--on-accent); }
+    .btn-primary:hover { background: var(--accent); }
+    .btn-ghost { background: var(--surface); color: var(--text); border-color: var(--border); }
+    .btn-ghost:hover { border-color: var(--accent); }
+    .btn-sm { padding: 7px 12px; font-size: 13px; border-radius: 8px; }
+    .btn svg { width: 18px; height: 18px; flex: none; }
+
+    /* Hero */
+    .hero { padding: 64px 0 48px; overflow: hidden; }
+    .hero .wrap { display: grid; gap: 48px; align-items: center; }
+    @media (min-width: 960px) { .hero .wrap { grid-template-columns: 1.05fr 1fr; } .hero { padding: 96px 0 72px; } }
+    .eyebrow {
+      display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600;
+      color: var(--accent); background: var(--accent-soft); padding: 5px 12px; border-radius: 999px;
+    }
+    h1 { font-size: clamp(36px, 6vw, 58px); line-height: 1.05; letter-spacing: -0.03em; margin: 18px 0 18px; font-weight: 800; }
+    h1 em { font-style: normal; color: var(--accent); }
+    .lead { font-size: 18px; color: var(--muted); max-width: 560px; margin: 0 0 28px; }
+    .cta { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+    .cta-note { font-size: 13px; color: var(--muted); margin-top: 14px; }
+
+    /* Terminal */
+    .term {
+      background: var(--term-bg); color: var(--term-text); border-radius: 14px; box-shadow: var(--shadow);
+      border: 1px solid #1d2d28; font-size: 13px; line-height: 1.7; overflow: hidden; min-width: 0;
+    }
+    .term-bar { display: flex; gap: 7px; padding: 12px 14px; border-bottom: 1px solid #1d2d28; align-items: center; }
+    .term-bar span { width: 11px; height: 11px; border-radius: 50%; background: #2a3b36; }
+    .term-bar b { margin-left: 10px; font-weight: 500; color: #7b928a; font-size: 12px; }
+    .term pre { margin: 0; padding: 16px 18px 18px; overflow-x: auto; white-space: pre; }
+    .t-dim { color: #6f877f; } .t-ok { color: #3ddba9; } .t-fail { color: #ff7d76; } .t-warn { color: #f0b85a; } .t-cmd { color: #fff; }
+
+    /* Sections */
+    section { padding: 72px 0; }
+    section.alt { background: var(--bg-alt); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+    h2 { font-size: clamp(28px, 4vw, 38px); letter-spacing: -0.02em; line-height: 1.15; margin: 0 0 12px; }
+    .section-lead { color: var(--muted); max-width: 640px; margin: 0 0 40px; font-size: 17px; }
+
+    .grid { display: grid; gap: 16px; }
+    @media (min-width: 640px) { .grid-2, .grid-3 { grid-template-columns: repeat(2, 1fr); } }
+    @media (min-width: 960px) { .grid-3 { grid-template-columns: repeat(3, 1fr); } }
+
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 22px; min-width: 0; }
+    .card h3 { margin: 12px 0 6px; font-size: 17px; }
+    .card p { margin: 0; color: var(--muted); font-size: 15px; }
+    .ico {
+      width: 38px; height: 38px; border-radius: 10px; display: grid; place-items: center;
+      background: var(--accent-soft); color: var(--accent);
+    }
+    .ico svg { width: 20px; height: 20px; }
+
+    .steps { counter-reset: step; }
+    .step { position: relative; padding-left: 52px; }
+    .step::before {
+      counter-increment: step; content: counter(step);
+      position: absolute; left: 22px; top: 22px; width: 30px; height: 30px; border-radius: 50%;
+      display: grid; place-items: center; font-weight: 700; font-size: 14px;
+      background: var(--accent-strong); color: var(--on-accent);
+    }
+    .step.card { padding-left: 66px; }
+    .step h3 { margin-top: 2px; }
+
+    /* Downloads */
+    .dl-card { display: flex; flex-direction: column; gap: 14px; position: relative; }
+    .dl-card.current { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+    .dl-head { display: flex; align-items: center; gap: 12px; }
+    .dl-head svg { width: 34px; height: 34px; color: var(--text); flex: none; }
+    .dl-head h3 { margin: 0; font-size: 20px; }
+    .dl-head small { display: block; color: var(--muted); font-size: 13px; }
+    .tag-current {
+      position: absolute; top: -11px; right: 16px; background: var(--accent-strong); color: var(--on-accent);
+      font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 999px; letter-spacing: .02em; display: none; color: var(--on-accent);
+    }
+    .dl-card.current .tag-current { display: block; }
+    .dl-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+    .dl-list a {
+      display: flex; justify-content: space-between; align-items: center; gap: 10px;
+      padding: 11px 14px; border-radius: 10px; border: 1px solid var(--border);
+      text-decoration: none; color: var(--text); font-weight: 500; font-size: 14px; background: var(--bg);
+    }
+    .dl-list a:hover { border-color: var(--accent); }
+    .dl-list a.primary { background: var(--accent-strong); border-color: var(--accent-strong); color: var(--on-accent); }
+    .dl-list a.primary .meta { color: var(--on-accent); opacity: .75; }
+    .dl-list .meta { color: var(--muted); font-size: 12px; white-space: nowrap; font-family: "JetBrains Mono", monospace; }
+    .pipe {
+      margin-top: auto; padding-top: 14px; border-top: 1px dashed var(--border);
+      display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 13px;
+    }
+    .pipe a { text-decoration: none; font-weight: 500; display: inline-flex; align-items: center; gap: 6px; }
+    .status { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+    .dot.ok { background: var(--ok); } .dot.fail { background: var(--fail); } .dot.run { background: var(--warn); }
+    .dl-hint { font-size: 12.5px; color: var(--muted); margin: 0; }
+
+    .release-bar {
+      display: flex; flex-wrap: wrap; gap: 8px 20px; align-items: center; justify-content: space-between;
+      margin: -16px 0 28px; font-size: 14px; color: var(--muted);
+    }
+    .release-bar strong { color: var(--text); }
+
+    /* CLI */
+    .cli { display: grid; gap: 24px; }
+    @media (min-width: 900px) { .cli { grid-template-columns: 1fr 1.1fr; align-items: start; } }
+    .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
+    .chip {
+      font-size: 13px; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--border);
+      color: var(--text); text-decoration: none; background: var(--surface); font-family: "JetBrains Mono", monospace;
+    }
+    .chip:hover { border-color: var(--accent); }
+
+    footer { padding: 40px 0 56px; color: var(--muted); font-size: 14px; }
+    footer .wrap { display: flex; flex-wrap: wrap; gap: 16px 28px; justify-content: space-between; align-items: center; }
+    footer nav { display: flex; flex-wrap: wrap; gap: 18px; }
+    footer a { color: var(--muted); text-decoration: none; }
+    footer a:hover { color: var(--text); }
+
+    .theme-toggle { background: none; border: 1px solid var(--border); color: var(--muted); border-radius: 8px; width: 34px; height: 34px; cursor: pointer; display: grid; place-items: center; }
+    .theme-toggle svg { width: 16px; height: 16px; }
+  </style>
+</head>
+<body>
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <symbol id="i-win" viewBox="0 0 24 24"><path fill="currentColor" d="M3 5.1 10.4 4v7.2H3V5.1Zm0 13.8 7.4 1.1v-7.1H3v6ZM11.3 3.9 21 2.5v8.7h-9.7V3.9Zm0 16.2 9.7 1.4v-8.6h-9.7v7.2Z"/></symbol>
+    <symbol id="i-mac" viewBox="0 0 24 24"><path fill="currentColor" d="M16.4 12.6c0-2.5 2-3.6 2.1-3.7-1.2-1.7-3-1.9-3.6-2-1.5-.2-3 .9-3.8.9-.8 0-2-.9-3.3-.8-1.7 0-3.3 1-4.1 2.5-1.8 3.1-.5 7.6 1.3 10.1.8 1.2 1.8 2.6 3.1 2.5 1.2 0 1.7-.8 3.2-.8s1.9.8 3.2.8c1.3 0 2.2-1.2 3-2.4 1-1.4 1.3-2.7 1.4-2.8-.1 0-2.6-1-2.5-4.3ZM14 5.2c.7-.8 1.1-1.9 1-3-1 0-2.1.6-2.8 1.4-.6.7-1.2 1.8-1 2.9 1 .1 2.1-.5 2.8-1.3Z"/></symbol>
+    <symbol id="i-linux" viewBox="0 0 24 24"><path fill="currentColor" d="M12.5 2c-2.3 0-3.6 1.8-3.6 4.4 0 1.3.2 2.1-.6 3.4-.9 1.4-2.6 3.4-2.9 5.6-.1 1 .1 1.8.5 2.4-.6.3-1.4.4-1.7 1-.4.8.4 1.4.3 2.1-.1.9 1 1.2 2.4 1.1 1.2-.1 2.2.6 3.2.4.9-.1 1.3-.7 1.4-1.2h2.1c.3.8 1 1.4 2.1 1.3 1.3-.1 2-1 3.1-1.7 1-.6 1.9-.9 1.8-1.7 0-.6-.7-.9-.9-1.5-.2-.5.1-1.3-.4-1.9.2-1.6-.6-3.4-1.6-4.8-.9-1.3-2.1-2.4-2.1-4.3 0-2.4-1-4.6-3.1-4.6Zm-1.4 3.6c.5 0 .8.6.8 1.2 0 .3-.1.5-.2.7l-.6-.2c.1-.1.1-.3.1-.5 0-.3-.1-.5-.3-.5-.2 0-.3.3-.3.6v.2l-.6-.3v-.2c0-.6.4-1 1.1-1Zm2.6 0c.6 0 1.1.5 1.1 1.2 0 .3-.1.5-.2.7l-.4-.2c.1-.1.1-.3.1-.5 0-.4-.2-.7-.5-.7s-.5.3-.5.7v.3l-.6-.2c0-.2-.1-.3-.1-.5 0-.4.5-.8 1.1-.8Zm-1.4 1.9c.6 0 1.4.4 2 .7.4.2.5.4.3.6-.3.4-1.5 1.1-2.4 1.1-.8 0-1.3-.5-1.8-.8-.2-.2-.5-.4-.4-.7.2-.4 1.3-1 2.3-.9Zm-3.3 4.9c.1.1.1.3 0 .4-.5 1.2-1.3 2.6-1.1 4.1.1.8.4 1.4.9 1.8-.3.2-.8.2-1 0-.5-.4-.5-1.4-.4-2.3.2-1.5 1-2.8 1.6-4Zm6.7.3c.6 1 1.3 2.4 1.3 3.8 0 .4-.1.8-.2 1.1-.4.1-.8.3-1.1.6-.1-1.6-.8-3.6-1.4-4.6.5-.2 1-.5 1.4-.9Z"/></symbol>
+    <symbol id="i-gh" viewBox="0 0 24 24"><path fill="currentColor" d="M12 2a10 10 0 0 0-3.2 19.5c.5.1.7-.2.7-.5v-1.7c-2.8.6-3.4-1.3-3.4-1.3-.4-1.2-1.1-1.5-1.1-1.5-.9-.6.1-.6.1-.6 1 .1 1.5 1 1.5 1 .9 1.6 2.4 1.1 3 .9.1-.7.4-1.1.6-1.4-2.2-.3-4.6-1.1-4.6-5 0-1.1.4-2 1-2.7-.1-.3-.4-1.3.1-2.7 0 0 .8-.3 2.8 1a9.6 9.6 0 0 1 5 0c1.9-1.3 2.8-1 2.8-1 .5 1.4.2 2.4.1 2.7.6.7 1 1.6 1 2.7 0 3.9-2.3 4.7-4.6 5 .4.3.7.9.7 1.9V21c0 .3.2.6.7.5A10 10 0 0 0 12 2Z"/></symbol>
+    <symbol id="i-dl" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M12 3v12m0 0-5-5m5 5 5-5M4 19h16"/></symbol>
+    <symbol id="i-pipe" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M6 3v12M6 15a3 3 0 1 0 0 6 3 3 0 0 0 0-6Zm12-6a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm0 0c0 6-12 3-12 9"/></symbol>
+  </svg>
+
+  <header class="nav">
+    <div class="wrap">
+      <a class="brand" href="#"><img src="icon.svg" alt="">Endpoint Quality</a>
+      <nav class="nav-links" aria-label="Secciones">
+        <a href="#que-hace">Qué hace</a>
+        <a href="#como">Cómo funciona</a>
+        <a href="#descargas">Descargas</a>
+        <a href="#cli">CLI y CI</a>
+      </nav>
+      <a class="btn btn-ghost btn-sm gh" href="https://github.com/smalbach/eq-studio"><svg><use href="#i-gh"/></svg>GitHub</a>
+      <button class="theme-toggle" id="theme" type="button" aria-label="Cambiar tema">
+        <svg viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <main>
+    <div class="hero">
+      <div class="wrap">
+        <div>
+          <span class="eyebrow">Open source · MIT · Windows, macOS y Linux</span>
+          <h1>Un 200 no es un <em>test que pasa</em>.</h1>
+          <p class="lead">Endpoint Quality verifica cualquier API HTTP contra su contrato OpenAPI: status, schema, autenticación 401/403, persistencia real de lo que se escribe y flujos encadenados. Y la somete a carga, estrés, pico y resistencia.</p>
+          <div class="cta">
+            <a class="btn btn-primary" id="hero-dl" href="#descargas"><svg><use href="#i-dl"/></svg><span>Descargar</span></a>
+            <a class="btn btn-ghost" href="#descargas">Todas las plataformas</a>
+          </div>
+          <p class="cta-note" id="hero-note">Gratis y de código abierto. Tus datos se quedan en tu equipo.</p>
+        </div>
+
+        <div class="term" role="img" aria-label="Ejemplo de una corrida de eq en la terminal">
+          <div class="term-bar"><span></span><span></span><span></span><b>eq run — mock-store</b></div>
+<pre><span class="t-dim">$</span> <span class="t-cmd">eq run --file store.eq.json --env staging</span>
+<span class="t-dim">Contrato  openapi 3.1 · 24 operaciones · 186 casos</span>
+
+  <span class="t-ok">✓</span> GET    /products              <span class="t-dim">200  schema ok   38ms</span>
+  <span class="t-ok">✓</span> GET    /products/{id}         <span class="t-dim">200  schema ok   21ms</span>
+  <span class="t-ok">✓</span> GET    /orders                <span class="t-dim">401  sin token   9ms</span>
+  <span class="t-ok">✓</span> GET    /orders                <span class="t-dim">403  read-token  11ms</span>
+  <span class="t-ok">✓</span> POST   /products              <span class="t-dim">201  persistió   44ms</span>
+  <span class="t-fail">✗</span> PATCH  /products/{id}         <span class="t-fail">200  price: string ≠ number</span>
+  <span class="t-ok">✓</span> POST   /products  <span class="t-dim">(falta name) 422  negativo   12ms</span>
+  <span class="t-warn">!</span> GET    /search                <span class="t-warn">p95 412ms &gt; presupuesto 300ms</span>
+  <span class="t-ok">✓</span> DELETE /products/{id}         <span class="t-dim">204  limpiado   17ms</span>
+
+<span class="t-ok">184 pasaron</span> · <span class="t-fail">1 falló</span> · <span class="t-warn">1 fuera de presupuesto</span>
+<span class="t-dim">→ eq-report.xml · report.html · results.sarif</span></pre>
+        </div>
+      </div>
+    </div>
+
+    <section class="alt" id="que-hace">
+      <div class="wrap">
+        <h2>Lo que un test de humo no ve</h2>
+        <p class="section-lead">Cada respuesta se valida contra el schema que el propio contrato declara. Cada escritura se vuelve a leer. Cada operación protegida recibe sus casos 401 y 403.</p>
+        <div class="grid grid-3">
+          <div class="card">
+            <div class="ico"><svg viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4M7 3h10a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z"/></svg></div>
+            <h3>Verificación funcional</h3>
+            <p>Status y schema por operación, escrituras que se releen para comprobar que persistieron y flujos encadenados que limpian lo que crean.</p>
+          </div>
+          <div class="card">
+            <div class="ico"><svg viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7l8-4Z"/></svg></div>
+            <h3>Autenticación real</h3>
+            <p>Casos 401 y 403 automáticos. Bearer, API key, basic, OAuth2, cookies, firma HMAC y mTLS, todo cifrado y nunca devuelto.</p>
+          </div>
+          <div class="card">
+            <div class="ico"><svg viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M3 17l5-6 4 4 8-9M14 6h6v6"/></svg></div>
+            <h3>Carga, estrés, pico y resistencia</h3>
+            <p>El mismo proyecto sirve para pruebas de rendimiento, con presupuestos de latencia por operación que nunca se inventan.</p>
+          </div>
+          <div class="card">
+            <div class="ico"><svg viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M12 9v4m0 4h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/></svg></div>
+            <h3>Casos negativos</h3>
+            <p>De cada schema de entrada salen casos con una sola falta: campo ausente, tipo equivocado, fuera de rango, enum o formato.</p>
+          </div>
+          <div class="card">
+            <div class="ico"><svg viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M8 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h2M16 3h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-2M9 12h6"/></svg></div>
+            <h3>Cualquier contrato</h3>
+            <p>OpenAPI 3.0 y 3.1, Swagger 2.0 y colecciones de Postman. Entre dos versiones ves qué cambió y qué rompe clientes.</p>
+          </div>
+          <div class="card">
+            <div class="ico"><svg viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M17 18a4 4 0 0 0 0-8 6 6 0 0 0-11.7 1.5A3.5 3.5 0 0 0 6.5 18H17Z"/></svg></div>
+            <h3>Local, CI y nube</h3>
+            <p>Informes HTML, SARIF y JUnit, programaciones con avisos por Slack, webhook o email, y sincronización entre equipos.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="como">
+      <div class="wrap">
+        <h2>De un contrato a una matriz en verde</h2>
+        <p class="section-lead">Sin escribir tests a mano. El orden de ejecución corre las lecturas primero y los DELETE al final, para que un borrado roto no contagie de rojo al resto.</p>
+        <div class="grid grid-3 steps">
+          <div class="card step">
+            <h3>Importa el contrato</h3>
+            <p>Pega la URL de tu <code>openapi.json</code>, sube un archivo o una colección de Postman.</p>
+          </div>
+          <div class="card step">
+            <h3>Elige el entorno</h3>
+            <p>URL base, si admite escrituras y las credenciales: principal, de permisos insuficientes y alternativa.</p>
+          </div>
+          <div class="card step">
+            <h3>Corre la matriz</h3>
+            <p>Empieza por la matriz GET; luego la completa, la de carga o llévala a tu CI con <code>eq run</code>.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="alt" id="descargas">
+      <div class="wrap">
+        <h2>Descargas</h2>
+        <p class="section-lead">La app de escritorio trae todo dentro: no necesitas Node ni terminal. Cada instalador sale del pipeline de release en GitHub Actions, construido en su propio sistema operativo.</p>
+        <div class="release-bar">
+          <span id="release-info">Buscando la última versión…</span>
+          <a href="https://github.com/smalbach/eq-studio/releases">Todas las versiones y notas →</a>
+        </div>
+
+        <div class="grid grid-3">
+          <article class="card dl-card" data-os="windows">
+            <span class="tag-current">Tu sistema</span>
+            <div class="dl-head"><svg><use href="#i-win"/></svg><div><h3>Windows</h3><small>Windows 10 y 11 · x64</small></div></div>
+            <ul class="dl-list">
+              <li><a class="primary" data-asset="win-exe" href="https://github.com/smalbach/eq-studio/releases/latest"><span>Instalador (.exe)</span><span class="meta">x64</span></a></li>
+            </ul>
+            <p class="dl-hint">Si SmartScreen avisa, elige «Más información» → «Ejecutar de todas formas».</p>
+            <div class="pipe">
+              <a data-job="desktop windows-x64" href="https://github.com/smalbach/eq-studio/actions/workflows/release.yml"><svg width="15" height="15"><use href="#i-pipe"/></svg>Pipeline windows-x64</a>
+              <span class="status" data-status><span class="dot"></span><span>—</span></span>
+            </div>
+          </article>
+
+          <article class="card dl-card" data-os="mac">
+            <span class="tag-current">Tu sistema</span>
+            <div class="dl-head"><svg><use href="#i-mac"/></svg><div><h3>macOS</h3><small>Apple Silicon e Intel</small></div></div>
+            <ul class="dl-list">
+              <li><a class="primary" data-asset="mac-arm64" href="https://github.com/smalbach/eq-studio/releases/latest"><span>Apple Silicon (.dmg)</span><span class="meta">arm64</span></a></li>
+              <li><a data-asset="mac-x64" href="https://github.com/smalbach/eq-studio/releases/latest"><span>Intel (.dmg)</span><span class="meta">x64</span></a></li>
+            </ul>
+            <p class="dl-hint">Firma ad hoc: la primera vez, clic derecho sobre la app → «Abrir».</p>
+            <div class="pipe">
+              <a data-job="desktop macos-arm64" href="https://github.com/smalbach/eq-studio/actions/workflows/release.yml"><svg width="15" height="15"><use href="#i-pipe"/></svg>Pipeline macos</a>
+              <span class="status" data-status><span class="dot"></span><span>—</span></span>
+            </div>
+          </article>
+
+          <article class="card dl-card" data-os="linux">
+            <span class="tag-current">Tu sistema</span>
+            <div class="dl-head"><svg><use href="#i-linux"/></svg><div><h3>Linux</h3><small>x64 · AppImage y Debian/Ubuntu</small></div></div>
+            <ul class="dl-list">
+              <li><a class="primary" data-asset="linux-appimage" href="https://github.com/smalbach/eq-studio/releases/latest"><span>AppImage</span><span class="meta">x86_64</span></a></li>
+              <li><a data-asset="linux-deb" href="https://github.com/smalbach/eq-studio/releases/latest"><span>Paquete .deb</span><span class="meta">amd64</span></a></li>
+            </ul>
+            <p class="dl-hint"><code>chmod +x</code> al AppImage, o <code>sudo apt install ./endpoint-quality-*.deb</code>.</p>
+            <div class="pipe">
+              <a data-job="desktop linux-x64" href="https://github.com/smalbach/eq-studio/actions/workflows/release.yml"><svg width="15" height="15"><use href="#i-pipe"/></svg>Pipeline linux-x64</a>
+              <span class="status" data-status><span class="dot"></span><span>—</span></span>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section id="cli">
+      <div class="wrap cli">
+        <div>
+          <h2>También en la terminal y en tu CI</h2>
+          <p class="section-lead" style="margin-bottom:0">La CLI <code>eq</code> corre los mismos proyectos sin servidor. Sale con <code>0</code> si todo pasó y <code>1</code> si algún caso falló, y escribe JUnit, HTML y SARIF. Binarios de un solo archivo, sin Node:</p>
+          <div class="chips" id="cli-chips">
+            <a class="chip" data-asset="cli-darwin-arm64" href="https://github.com/smalbach/eq-studio/releases/latest">macOS arm64</a>
+            <a class="chip" data-asset="cli-darwin-x64" href="https://github.com/smalbach/eq-studio/releases/latest">macOS x64</a>
+            <a class="chip" data-asset="cli-win32-x64" href="https://github.com/smalbach/eq-studio/releases/latest">Windows x64</a>
+            <a class="chip" data-asset="cli-linux-x64" href="https://github.com/smalbach/eq-studio/releases/latest">Linux x64</a>
+            <a class="chip" data-asset="cli-linux-arm64" href="https://github.com/smalbach/eq-studio/releases/latest">Linux arm64</a>
+          </div>
+        </div>
+        <div class="term">
+          <div class="term-bar"><span></span><span></span><span></span><b>sin instalar nada</b></div>
+<pre><span class="t-dim"># la app y el API en http://127.0.0.1:4400</span>
+<span class="t-cmd">npx endpoint-quality serve --open</span>
+
+<span class="t-dim"># en CI: falla el job si el contrato no se cumple</span>
+<span class="t-cmd">npx endpoint-quality run --file proyecto.eq.json \
+  --env staging --base-url "$URL" --token "$TOKEN" \
+  --junit eq-report.xml --sarif eq.sarif</span>
+
+<span class="t-dim"># ¿el contrato nuevo rompe clientes?</span>
+<span class="t-cmd">eq diff viejo.yaml nuevo.yaml</span></pre>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <span>Endpoint Quality · Licencia MIT</span>
+      <nav aria-label="Enlaces">
+        <a href="https://github.com/smalbach/eq-studio">Código</a>
+        <a href="https://github.com/smalbach/eq-studio/releases">Releases</a>
+        <a href="https://github.com/smalbach/eq-studio/actions">Pipelines</a>
+        <a href="https://github.com/smalbach/eq-studio/blob/main/CONTRIBUTING.md">Contribuir</a>
+        <a href="https://github.com/smalbach/eq-studio/blob/main/SECURITY.md">Seguridad</a>
+      </nav>
+    </div>
+  </footer>
+
+  <script>
+    const REPO = "smalbach/eq-studio";
+    const API = "https://api.github.com/repos/" + REPO;
+
+    // Theme toggle; the choice is a per-viewer convenience, so storage failures are ignored.
+    const root = document.documentElement;
+    try { const t = localStorage.getItem("eq-theme"); if (t) root.dataset.theme = t; } catch {}
+    document.getElementById("theme").addEventListener("click", () => {
+      const dark = root.dataset.theme ? root.dataset.theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+      root.dataset.theme = dark ? "light" : "dark";
+      try { localStorage.setItem("eq-theme", root.dataset.theme); } catch {}
+    });
+
+    // Asset names come from apps/desktop/electron-builder.yml (endpoint-quality-<version>-<os>-<arch>.<ext>)
+    // and apps/cli/scripts/sea.mjs (eq-<macos|windows|linux>-<arch>[.exe]).
+    const PATTERNS = {
+      "win-exe": /-win-x64\.exe$/,
+      "mac-arm64": /-mac-arm64\.dmg$/,
+      "mac-x64": /-mac-x64\.dmg$/,
+      "linux-appimage": /-linux-.*\.AppImage$/,
+      "linux-deb": /-linux-.*\.deb$/,
+      "cli-darwin-arm64": /^eq-macos-arm64$/,
+      "cli-darwin-x64": /^eq-macos-x64$/,
+      "cli-win32-x64": /^eq-windows-x64\.exe$/,
+      "cli-linux-x64": /^eq-linux-x64$/,
+      "cli-linux-arm64": /^eq-linux-arm64$/,
+    };
+
+    function detectOS() {
+      const p = (navigator.userAgentData?.platform || navigator.platform || navigator.userAgent).toLowerCase();
+      if (p.includes("win")) return "windows";
+      if (p.includes("mac")) return "mac";
+      if (p.includes("linux") && !/android/i.test(navigator.userAgent)) return "linux";
+      return null;
+    }
+
+    const size = (b) => b > 1e6 ? (b / 1048576).toFixed(0) + " MB" : (b / 1024).toFixed(0) + " KB";
+
+    const os = detectOS();
+    const heroBtn = document.getElementById("hero-dl");
+    const OS_LABEL = { windows: "Descargar para Windows", mac: "Descargar para macOS", linux: "Descargar para Linux" };
+    if (os) {
+      document.querySelector(`.dl-card[data-os="${os}"]`)?.classList.add("current");
+      heroBtn.querySelector("span").textContent = OS_LABEL[os];
+    }
+
+    async function loadRelease() {
+      const info = document.getElementById("release-info");
+      try {
+        const res = await fetch(API + "/releases/latest", { headers: { Accept: "application/vnd.github+json" } });
+        if (!res.ok) throw new Error(res.status);
+        const rel = await res.json();
+        const date = new Date(rel.published_at).toLocaleDateString("es", { day: "numeric", month: "long", year: "numeric" });
+        info.innerHTML = `Última versión: <strong>${rel.tag_name}</strong> · ${date}`;
+        for (const el of document.querySelectorAll("[data-asset]")) {
+          const asset = rel.assets.find((a) => PATTERNS[el.dataset.asset].test(a.name));
+          if (!asset) continue;
+          el.href = asset.browser_download_url;
+          el.title = asset.name;
+          const meta = el.querySelector(".meta");
+          if (meta) meta.textContent = size(asset.size);
+        }
+        // The hero button goes straight to the visitor's installer when there is one.
+        const firstForOS = os && document.querySelector(`.dl-card[data-os="${os}"] a.primary`);
+        if (firstForOS && firstForOS.href.includes("/download/")) heroBtn.href = firstForOS.href;
+        if (os === "mac" && firstForOS) document.getElementById("hero-note").textContent = "Apple Silicon. ¿Mac con Intel? Está en Descargas.";
+      } catch {
+        info.textContent = "Aún no hay una versión publicada: los enlaces abren la página de releases.";
+      }
+    }
+
+    async function loadPipelines() {
+      try {
+        const runs = await fetch(API + "/actions/workflows/release.yml/runs?per_page=1&exclude_pull_requests=true").then((r) => r.ok ? r.json() : Promise.reject());
+        const run = runs.workflow_runs?.[0];
+        if (!run) {
+          for (const s of document.querySelectorAll("[data-status] span:last-child")) s.textContent = "sin builds aún";
+          return;
+        }
+        const jobs = await fetch(run.jobs_url + "?per_page=50").then((r) => r.ok ? r.json() : Promise.reject());
+        for (const link of document.querySelectorAll("[data-job]")) {
+          const job = jobs.jobs?.find((j) => j.name === link.dataset.job);
+          const status = link.closest(".pipe").querySelector("[data-status]");
+          const target = job || run;
+          link.href = target.html_url;
+          const state = target.status !== "completed" ? "run" : target.conclusion === "success" ? "ok" : "fail";
+          status.querySelector(".dot").className = "dot " + state;
+          status.querySelector("span:last-child").textContent =
+            state === "run" ? "en curso" : state === "ok" ? "build ok · " + run.head_branch : "falló";
+        }
+      } catch { /* the links keep pointing at the workflow page */ }
+    }
+
+    loadRelease();
+    loadPipelines();
+  </script>
+</body>
+</html>
