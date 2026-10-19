@@ -138,7 +138,7 @@ export class NotificationService {
     const verdict = verdictOf(run.status);
     const previousVerdict = previous ? verdictOf(previous.status) : null;
     const section = run.kind === "load" ? "carga" : "funcional";
-    const url = this.config.publicUrl ? `${this.config.publicUrl}/?vista=${section}&proyecto=${encodeURIComponent(project.slug)}&corrida=${run.id}` : null;
+    const url = this.config.publicUrl ? `${this.config.publicUrl}/app/?vista=${section}&proyecto=${encodeURIComponent(project.slug)}&corrida=${run.id}` : null;
     return {
       event: "run.finished", sentAt: isoNow(),
       project: { id: project.id, slug: project.slug, name: project.name },

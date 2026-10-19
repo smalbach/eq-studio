@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -51,6 +51,30 @@ test("the local database survives a restart: same file, same projects", async ()
     assert.deepEqual(projects.map((project: { slug: string; operationCount: number }) => [project.slug, project.operationCount]), [["orders", 2]]);
     await second.close();
   } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("in cloud mode the landing page is the root and the app is at /app/", async () => {
+  const directory = mkdtempSync(join(tmpdir(), "eq-web-"));
+  writeFileSync(join(directory, "index.html"), "<!doctype html><title>Endpoint Quality app</title>");
+  mkdirSync(join(directory, "download"));
+  writeFileSync(join(directory, "download", "index.html"), '<!doctype html><title>Landing</title><img src="icon.svg"><!-- app-link: the hosted app puts its sign-in link here -->');
+  const app = await createApp({ ...testConfig({ type: "sqlite", file: null }, undefined, { allowPrivateTargets: false }), webDir: directory });
+  await app.listen(0, "127.0.0.1");
+  const base = `http://127.0.0.1:${(app.getHttpServer().address() as { port: number }).port}`;
+  try {
+    const landing = await (await fetch(`${base}/`)).text();
+    assert.match(landing, /<title>Landing<\/title>/);
+    assert.match(landing, /href="\/app\/"/, "the landing page links to the app");
+    assert.match(landing, /src="\/download\/icon\.svg"/, "its icon resolves from the root");
+    assert.match(await (await fetch(`${base}/app/`)).text(), /Endpoint Quality app/);
+    assert.match(await (await fetch(`${base}/app/?vista=funcional`)).text(), /Endpoint Quality app/);
+    const old = await fetch(`${base}/?restablecer=abc&x=1`, { redirect: "manual" });
+    assert.equal(old.headers.get("location"), "/app/?restablecer=abc&x=1", "a link from before the move still reaches the app");
+    assert.equal((await fetch(`${base}/download/`, { redirect: "manual" })).headers.get("location"), "/");
+  } finally {
+    await app.close();
     rmSync(directory, { recursive: true, force: true });
   }
 });

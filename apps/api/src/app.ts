@@ -61,7 +61,7 @@ export async function createApp(config: AppConfig, overrides: { specFetcher?: Sp
   if (config.metrics?.enabled) app.use(app.get(Metrics).middleware);
   app.use(requestContextMiddleware);
   if (config.network?.corsOrigins.length) app.enableCors({ origin: config.network.corsOrigins, credentials: true });
-  serveWebApp(app, config.webDir);
+  serveWebApp(app, config.webDir, config.mode === "cloud");
   app.useGlobalFilters(new ProblemDetailsFilter());
   app.enableShutdownHooks();
   return app;
@@ -71,10 +71,10 @@ export async function createApp(config: AppConfig, overrides: { specFetcher?: Sp
  * The built web app from the same origin as the API: one process, one port, no CORS. Any GET
  * that is not the API falls back to `index.html`, so the SPA's own routes reload correctly.
  */
-function serveWebApp(app: NestExpressApplication, directory: string | undefined) {
+function serveWebApp(app: NestExpressApplication, directory: string | undefined, landingAtRoot: boolean) {
   const index = directory ? join(directory, "index.html") : "";
   if (!directory || !existsSync(index)) return;
-  serveLanding(app, join(directory, "download", "index.html"));
+  serveLanding(app, join(directory, "download", "index.html"), landingAtRoot);
   app.useStaticAssets(directory, { index: false, maxAge: "1h" });
   const html = readFileSync(index, "utf8");
   // The app's only inline script (the theme, before the first paint) is allowed by its hash.
@@ -88,19 +88,26 @@ function serveWebApp(app: NestExpressApplication, directory: string | undefined)
 }
 
 /**
- * The landing page (site/, copied by the bundle into web/download/) at /download/, so a hosted
- * deployment needs no second service for it. Its own policy: it loads Google Fonts and reads the
- * latest release from the GitHub API.
+ * The landing page (site/, copied by the bundle into web/download/), so a hosted deployment needs
+ * no second service for it. In cloud mode it is the root and the app lives at /app/ (the app routes
+ * by its query string, so any path serves it); an old link to `/?…` still reaches the app. Locally
+ * the app keeps the root and the page is at /download/. Its own policy: it loads Google Fonts and
+ * reads the latest release from the GitHub API.
  */
-function serveLanding(app: NestExpressApplication, index: string) {
+function serveLanding(app: NestExpressApplication, index: string, atRoot: boolean) {
   if (!existsSync(index)) return;
-  const html = readFileSync(index, "utf8");
-  const policy = ["default-src 'self'", `script-src 'self' ${inlineScriptHashes(html).join(" ")}`, "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com", "img-src 'self' data:", "font-src 'self' https://fonts.gstatic.com", "connect-src 'self' https://api.github.com", "frame-ancestors 'none'", "base-uri 'self'", "form-action 'self'", "object-src 'none'"].join("; ");
-  app.use((request: { method: string; path: string }, response: { setHeader(name: string, value: string): void; redirect(status: number, url: string): void; type(value: string): { send(body: string): void } }, next: () => void) => {
+  const page = readFileSync(index, "utf8");
+  const policy = ["default-src 'self'", `script-src 'self' ${inlineScriptHashes(page).join(" ")}`, "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com", "img-src 'self' data:", "font-src 'self' https://fonts.gstatic.com", "connect-src 'self' https://api.github.com", "frame-ancestors 'none'", "base-uri 'self'", "form-action 'self'", "object-src 'none'"].join("; ");
+  const html = page
+    .replace("<!-- app-link: the hosted app puts its sign-in link here -->", `<a class="btn btn-primary btn-sm" href="${atRoot ? "/app/" : "/"}">Abrir la app</a>`)
+    .replaceAll('"icon.svg"', '"/download/icon.svg"');
+  app.use((request: { method: string; path: string; url: string }, response: { setHeader(name: string, value: string): void; redirect(status: number, url: string): void; type(value: string): { send(body: string): void } }, next: () => void) => {
     if (request.method !== "GET") return next();
-    // Without the slash, the page's relative icon.svg would resolve against the root.
-    if (request.path === "/download") return response.redirect(301, "/download/");
-    if (request.path !== "/download/" && request.path !== "/download/index.html") return next();
+    const landing = atRoot ? request.path === "/" : request.path === "/download/" || request.path === "/download/index.html";
+    if (atRoot && request.path === "/" && request.url !== "/") return response.redirect(302, `/app/${request.url.slice(1)}`);
+    if (atRoot && ["/download", "/download/", "/download/index.html"].includes(request.path)) return response.redirect(301, "/");
+    if (!atRoot && request.path === "/download") return response.redirect(301, "/download/");
+    if (!landing) return next();
     response.setHeader("Content-Security-Policy", policy);
     response.type("html").send(html);
   });

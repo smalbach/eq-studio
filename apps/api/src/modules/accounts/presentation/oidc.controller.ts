@@ -28,6 +28,7 @@ export class OidcController {
   constructor(@Inject(CommandBus) private readonly commands: CommandBus, @Inject(OidcClient) private readonly oidc: OidcClient, @Inject(APP_CONFIG) private readonly config: AppConfig, @Inject(RateLimiter) private readonly limiter: RateLimiter) {}
 
   private get app() { return this.config.publicUrl!; }
+  private get page() { return `${this.app}/app/`; }
 
   @Public()
   @Get("start")
@@ -40,7 +41,7 @@ export class OidcController {
       response.redirect(302, url);
     } catch (error) {
       this.logger.error(`The provider could not be reached: ${error instanceof Error ? error.message : String(error)}`);
-      response.redirect(302, `${this.app}/?sso_error=failed`);
+      response.redirect(302, `${this.page}?sso_error=failed`);
     }
   }
 
@@ -51,16 +52,16 @@ export class OidcController {
     this.limiter.check(`oidc:${request.ip}`, 20);
     const flow = this.oidc.open(cookieOf(request, FLOW_COOKIE));
     response.clearCookie(FLOW_COOKIE, flowOptions(request));
-    if (!flow) { response.redirect(302, `${this.app}/?sso_error=expired`); return; }
+    if (!flow) { response.redirect(302, `${this.page}?sso_error=expired`); return; }
     try {
       // The URL the provider redirected to, rebuilt on the configured address (it must match the registered redirect URI).
       const claims = await this.oidc.finish(new URL(request.originalUrl, this.app), flow);
       const session: Session = await this.commands.execute(new SsoSignInCommand(claims.email, claims.verified, claims.name));
       response.cookie(COOKIE, session.refreshToken, { ...cookieOptions(request), maxAge: this.config.auth!.refreshTtlDays * 86_400_000 });
-      response.redirect(302, `${this.app}/`);
+      response.redirect(302, this.page);
     } catch (error) {
       if (!(error instanceof SsoRefused)) this.logger.warn(`Single sign-on failed: ${error instanceof Error ? error.message : String(error)}`);
-      response.redirect(302, `${this.app}/?sso_error=${error instanceof SsoRefused ? error.code : "failed"}`);
+      response.redirect(302, `${this.page}?sso_error=${error instanceof SsoRefused ? error.code : "failed"}`);
     }
   }
 }

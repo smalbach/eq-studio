@@ -63,7 +63,7 @@ for (const database of databases()) {
       await tick();
       assert.equal(sent.length, 1, "only the real account gets an email");
       assert.equal(sent[0].to, "owner@example.com");
-      assert.match(sent[0].text, /https:\/\/eq\.example\.com\/\?restablecer=eqp_/, "the link is built on EQ_PUBLIC_URL, never the Host header");
+      assert.match(sent[0].text, /https:\/\/eq\.example\.com\/app\/\?restablecer=eqp_/, "the link is built on EQ_PUBLIC_URL, never the Host header");
     });
 
     test("a reset link works once, sets the password and closes every session", async () => {
@@ -317,7 +317,7 @@ for (const registration of ["invite", "open"] as const) {
 
     test("the first account signs in and owns its workspace; an existing account is found by verified email", async () => {
       const first = await signIn({ sub: "u1", email: "Owner@Example.com", email_verified: true, name: "Owner" });
-      assert.equal(first.location, `${PUBLIC}/`);
+      assert.equal(first.location, `${PUBLIC}/app/`);
       const owner = await session(first.refresh);
       assert.equal(owner.user.email, "owner@example.com");
       assert.equal(owner.workspaces[0].role, "owner");
@@ -328,13 +328,13 @@ for (const registration of ["invite", "open"] as const) {
     });
 
     test("an unverified email, another domain or a tampered state is refused", async () => {
-      assert.equal((await signIn({ sub: "u2", email: "x@example.com", email_verified: false })).location, `${PUBLIC}/?sso_error=unverified`);
-      assert.equal((await signIn({ sub: "u3", email: "x@elsewhere.org", email_verified: true })).location, `${PUBLIC}/?sso_error=domain`);
+      assert.equal((await signIn({ sub: "u2", email: "x@example.com", email_verified: false })).location, `${PUBLIC}/app/?sso_error=unverified`);
+      assert.equal((await signIn({ sub: "u3", email: "x@elsewhere.org", email_verified: true })).location, `${PUBLIC}/app/?sso_error=domain`);
       const tampered = await signIn({ sub: "u1", email: "owner@example.com", email_verified: true }, (params) => params.set("state", "forged"));
-      assert.equal(tampered.location, `${PUBLIC}/?sso_error=failed`);
+      assert.equal(tampered.location, `${PUBLIC}/app/?sso_error=failed`);
       assert.equal(tampered.refresh, undefined);
       const replay = await fetch(`${h.base}/v1/auth/oidc/callback?code=x&state=y`, { redirect: "manual" });
-      assert.equal(replay.headers.get("location"), `${PUBLIC}/?sso_error=expired`, "no flow cookie, no sign-in");
+      assert.equal(replay.headers.get("location"), `${PUBLIC}/app/?sso_error=expired`, "no flow cookie, no sign-in");
     });
 
     test(registration === "invite" ? "a new email signs in only with an invitation, and joins that workspace" : "a new email gets an account and a workspace of its own", async () => {
@@ -344,7 +344,7 @@ for (const registration of ["invite", "open"] as const) {
         assert.deepEqual(newcomer.workspaces.map((item: { role: string }) => item.role), ["owner"]);
         return;
       }
-      assert.equal(outcome.location, `${PUBLIC}/?sso_error=not_invited`);
+      assert.equal(outcome.location, `${PUBLIC}/app/?sso_error=not_invited`);
       const owner = await session((await signIn({ sub: "u1", email: "owner@example.com", email_verified: true })).refresh);
       await h.request("POST", "/v1/workspace/invitations", { email: "newcomer@example.com", role: "editor" }, bearer(owner.accessToken));
       const invited = await session((await signIn({ sub: "u4", email: "newcomer@example.com", email_verified: true, name: "Newcomer" })).refresh);

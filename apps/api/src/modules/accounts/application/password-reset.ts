@@ -28,7 +28,9 @@ const logger = new Logger("PasswordReset");
 
 /** The address people open: configured, or the development cloud's own. Never a request's Host. */
 export const publicUrlOf = (config: AppConfig) => config.publicUrl ?? `http://localhost:${config.port || 4400}`;
-export const resetLink = (config: AppConfig, token: string) => `${publicUrlOf(config)}/?restablecer=${encodeURIComponent(token)}`;
+/** The web app's page: at /app/, since a hosted deployment serves the landing page at the root. */
+export const appUrlOf = (config: AppConfig) => `${publicUrlOf(config)}/app/`;
+export const resetLink = (config: AppConfig, token: string) => `${appUrlOf(config)}?restablecer=${encodeURIComponent(token)}`;
 
 async function createReset(accounts: AccountsRepository, user: UserRow, createdBy: string | null) {
   const token = randomToken("eqp");
