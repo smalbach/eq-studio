@@ -3,6 +3,7 @@
  *
  *   dist/eq.cjs           the CLI, the API and the engine in one CommonJS file (Node ≥ 22)
  *   dist/web/             the built web app the API serves
+ *   dist/web/download/    the landing page (site/), served at /download/
  *   dist/examples/        the bundled example projects
  *   dist/sql-wasm.wasm    SQLite for the local database
  *
@@ -48,6 +49,7 @@ await build({
 });
 
 cpSync(join(repository, "apps", "web", "dist"), join(out, "web"), { recursive: true });
+cpSync(join(repository, "site"), join(out, "web", "download"), { recursive: true });
 cpSync(join(repository, "examples"), join(out, "examples"), { recursive: true });
 cpSync(join(dirname(require.resolve("sql.js")), "sql-wasm.wasm"), join(out, "sql-wasm.wasm"));
 if (!existsSync(join(out, "web", "index.html"))) throw new Error("The web app was not built");

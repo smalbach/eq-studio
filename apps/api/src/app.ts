@@ -74,16 +74,40 @@ export async function createApp(config: AppConfig, overrides: { specFetcher?: Sp
 function serveWebApp(app: NestExpressApplication, directory: string | undefined) {
   const index = directory ? join(directory, "index.html") : "";
   if (!directory || !existsSync(index)) return;
+  serveLanding(app, join(directory, "download", "index.html"));
   app.useStaticAssets(directory, { index: false, maxAge: "1h" });
   const html = readFileSync(index, "utf8");
   // The app's only inline script (the theme, before the first paint) is allowed by its hash.
-  const inline = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((match) => `'sha256-${createHash("sha256").update(match[1]).digest("base64")}'`);
+  const inline = inlineScriptHashes(html);
   const policy = ["default-src 'self'", `script-src 'self' ${inline.join(" ")}`, "style-src 'self' 'unsafe-inline'", "img-src 'self' data:", "font-src 'self' data:", "connect-src 'self'", "frame-ancestors 'none'", "base-uri 'self'", "form-action 'self'", "object-src 'none'"].join("; ");
   app.use((request: { method: string; path: string }, response: { setHeader(name: string, value: string): void; type(value: string): { send(body: string): void } }, next: () => void) => {
     if (request.method !== "GET" || request.path.startsWith("/v1/") || request.path === "/health" || request.path === "/metrics") return next();
     response.setHeader("Content-Security-Policy", policy);
     response.type("html").send(html);
   });
+}
+
+/**
+ * The landing page (site/, copied by the bundle into web/download/) at /download/, so a hosted
+ * deployment needs no second service for it. Its own policy: it loads Google Fonts and reads the
+ * latest release from the GitHub API.
+ */
+function serveLanding(app: NestExpressApplication, index: string) {
+  if (!existsSync(index)) return;
+  const html = readFileSync(index, "utf8");
+  const policy = ["default-src 'self'", `script-src 'self' ${inlineScriptHashes(html).join(" ")}`, "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com", "img-src 'self' data:", "font-src 'self' https://fonts.gstatic.com", "connect-src 'self' https://api.github.com", "frame-ancestors 'none'", "base-uri 'self'", "form-action 'self'", "object-src 'none'"].join("; ");
+  app.use((request: { method: string; path: string }, response: { setHeader(name: string, value: string): void; redirect(status: number, url: string): void; type(value: string): { send(body: string): void } }, next: () => void) => {
+    if (request.method !== "GET") return next();
+    // Without the slash, the page's relative icon.svg would resolve against the root.
+    if (request.path === "/download") return response.redirect(301, "/download/");
+    if (request.path !== "/download/" && request.path !== "/download/index.html") return next();
+    response.setHeader("Content-Security-Policy", policy);
+    response.type("html").send(html);
+  });
+}
+
+function inlineScriptHashes(html: string) {
+  return [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((match) => `'sha256-${createHash("sha256").update(match[1]).digest("base64")}'`);
 }
 
 /** Headers every response carries: no sniffing, no framing, no referrer leaking a run's URL. */
