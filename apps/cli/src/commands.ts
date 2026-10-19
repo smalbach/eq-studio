@@ -23,11 +23,12 @@ const log = (line: string) => process.stderr.write(`${line}\n`);
 const remote = (flags: Flags) => client(str(flags, "api") ?? process.env.EQ_API_URL ?? "http://127.0.0.1:4400", { token: str(flags, "api-token") ?? process.env.EQ_API_TOKEN, workspace: str(flags, "workspace") ?? process.env.EQ_WORKSPACE });
 
 export async function serve(flags: Flags) {
-  const port = num(flags, "port", Number(process.env.EQ_PORT ?? 4400));
+  // PORT is what a platform like Railway or Render assigns; EQ_PORT still wins when both are set.
+  const port = num(flags, "port", Number(process.env.EQ_PORT ?? process.env.PORT ?? 4400));
   const cloud = process.env.EQ_MODE === "cloud";
   const host = str(flags, "host") ?? process.env.EQ_HOST ?? (cloud ? "0.0.0.0" : "127.0.0.1");
   const server = await startServer({ port, host, persistent: true, autoSync: true });
-  log(`${bold("Endpoint Quality")} ${VERSION} · ${green(server.url)} · ${cloud ? "cloud mode" : `data in ${DATA_DIR}`}`);
+  log(`${bold("Endpoint Quality")} ${VERSION} · ${green(server.url)}${host === "0.0.0.0" ? dim(" (all interfaces)") : ""} · ${cloud ? "cloud mode" : `data in ${DATA_DIR}`}`);
   // Local mode has no accounts and no SSRF guard: on another interface, anyone who can reach it is its owner.
   if (!cloud && !["127.0.0.1", "localhost", "::1"].includes(host)) log(red(`warning: listening on ${host} in local mode — no sign-in, and requests can reach this machine's network. Use EQ_MODE=cloud to share it.`));
   log(dim("Ctrl+C to stop."));

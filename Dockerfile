@@ -9,11 +9,12 @@ COPY . .
 RUN pnpm install --frozen-lockfile && pnpm run bundle
 
 FROM node:24-bookworm-slim
-ENV NODE_ENV=production EQ_MODE=cloud EQ_PORT=4400
+# The port is PORT when the platform assigns one (Railway, Render), else 4400.
+ENV NODE_ENV=production EQ_MODE=cloud
 WORKDIR /app
 COPY --from=build /src/apps/cli/dist/ ./
 USER node
 EXPOSE 4400
 HEALTHCHECK --interval=15s --timeout=5s --start-period=20s --retries=3 \
-  CMD node -e "fetch('http://127.0.0.1:4400/health').then(r => process.exit(r.ok ? 0 : 1), () => process.exit(1))"
-CMD ["node", "eq.cjs", "serve", "--host", "0.0.0.0", "--port", "4400"]
+  CMD node -e "fetch('http://127.0.0.1:' + (process.env.EQ_PORT || process.env.PORT || 4400) + '/health').then(r => process.exit(r.ok ? 0 : 1), () => process.exit(1))"
+CMD ["node", "eq.cjs", "serve", "--host", "0.0.0.0"]

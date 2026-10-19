@@ -23,7 +23,7 @@ const HELP = `Endpoint Quality ${VERSION} — verify any HTTP API against its Op
 Usage
   eq serve [--port 4400] [--host 127.0.0.1] [--open]
       The web app and the API. Data in ~/.endpoint-quality (EQ_DATA_DIR to change it); port and
-      host also from EQ_PORT and EQ_HOST. Local mode has no sign-in: keep it on the loopback.
+      host also from EQ_PORT (or PORT) and EQ_HOST. Local mode has no sign-in: keep it on the loopback.
       With EQ_MODE=cloud it reads the hosted configuration from the environment instead and
       listens on 0.0.0.0 (EQ_DATABASE_URL, EQ_SECRETS_KEY, EQ_JWT_SECRET, EQ_QUEUE_DRIVER… see
       the app's documentation, "Cloud deployment").
