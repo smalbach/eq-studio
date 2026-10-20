@@ -180,53 +180,9 @@
     .step.card { padding-left: 66px; }
     .step h3 { margin-top: 2px; }
 
-    /* Downloads */
-    .dl-card { display: flex; flex-direction: column; gap: 14px; position: relative; }
-    .dl-card.current { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
-    .dl-head { display: flex; align-items: center; gap: 12px; }
-    .dl-head svg { width: 34px; height: 34px; color: var(--text); flex: none; }
-    .dl-head h3 { margin: 0; font-size: 20px; }
-    .dl-head small { display: block; color: var(--muted); font-size: 13px; }
-    .tag-current {
-      position: absolute; top: -11px; right: 16px; background: var(--accent-strong); color: var(--on-accent);
-      font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 999px; letter-spacing: .02em; display: none; color: var(--on-accent);
-    }
-    .dl-card.current .tag-current { display: block; }
-    .dl-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
-    .dl-list a {
-      display: flex; justify-content: space-between; align-items: center; gap: 10px;
-      padding: 11px 14px; border-radius: 10px; border: 1px solid var(--border);
-      text-decoration: none; color: var(--text); font-weight: 500; font-size: 14px; background: var(--bg);
-    }
-    .dl-list a:hover { border-color: var(--accent); }
-    .dl-list a.primary { background: var(--accent-strong); border-color: var(--accent-strong); color: var(--on-accent); }
-    .dl-list a.primary .meta { color: var(--on-accent); opacity: .75; }
-    .dl-list .meta { color: var(--muted); font-size: 12px; white-space: nowrap; font-family: "JetBrains Mono", monospace; }
-    .pipe {
-      margin-top: auto; padding-top: 14px; border-top: 1px dashed var(--border);
-      display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 13px;
-    }
-    .pipe a { text-decoration: none; font-weight: 500; display: inline-flex; align-items: center; gap: 6px; }
-    .status { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); }
-    .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
-    .dot.ok { background: var(--ok); } .dot.fail { background: var(--fail); } .dot.run { background: var(--warn); }
-    .dl-hint { font-size: 12.5px; color: var(--muted); margin: 0; }
-
-    .release-bar {
-      display: flex; flex-wrap: wrap; gap: 8px 20px; align-items: center; justify-content: space-between;
-      margin: -16px 0 28px; font-size: 14px; color: var(--muted);
-    }
-    .release-bar strong { color: var(--text); }
-
     /* CLI */
     .cli { display: grid; gap: 24px; }
     @media (min-width: 900px) { .cli { grid-template-columns: 1fr 1.1fr; align-items: start; } }
-    .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
-    .chip {
-      font-size: 13px; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--border);
-      color: var(--text); text-decoration: none; background: var(--surface); font-family: "JetBrains Mono", monospace;
-    }
-    .chip:hover { border-color: var(--accent); }
 
     footer { padding: 40px 0 56px; color: var(--muted); font-size: 14px; }
     footer .wrap { display: flex; flex-wrap: wrap; gap: 16px 28px; justify-content: space-between; align-items: center; }
@@ -424,12 +380,7 @@
 </head>
 <body>
   <svg width="0" height="0" style="position:absolute" aria-hidden="true">
-    <symbol id="i-win" viewBox="0 0 24 24"><path fill="currentColor" d="M3 5.1 10.4 4v7.2H3V5.1Zm0 13.8 7.4 1.1v-7.1H3v6ZM11.3 3.9 21 2.5v8.7h-9.7V3.9Zm0 16.2 9.7 1.4v-8.6h-9.7v7.2Z"/></symbol>
-    <symbol id="i-mac" viewBox="0 0 24 24"><path fill="currentColor" d="M16.4 12.6c0-2.5 2-3.6 2.1-3.7-1.2-1.7-3-1.9-3.6-2-1.5-.2-3 .9-3.8.9-.8 0-2-.9-3.3-.8-1.7 0-3.3 1-4.1 2.5-1.8 3.1-.5 7.6 1.3 10.1.8 1.2 1.8 2.6 3.1 2.5 1.2 0 1.7-.8 3.2-.8s1.9.8 3.2.8c1.3 0 2.2-1.2 3-2.4 1-1.4 1.3-2.7 1.4-2.8-.1 0-2.6-1-2.5-4.3ZM14 5.2c.7-.8 1.1-1.9 1-3-1 0-2.1.6-2.8 1.4-.6.7-1.2 1.8-1 2.9 1 .1 2.1-.5 2.8-1.3Z"/></symbol>
-    <symbol id="i-linux" viewBox="0 0 24 24"><path fill="currentColor" d="M12.5 2c-2.3 0-3.6 1.8-3.6 4.4 0 1.3.2 2.1-.6 3.4-.9 1.4-2.6 3.4-2.9 5.6-.1 1 .1 1.8.5 2.4-.6.3-1.4.4-1.7 1-.4.8.4 1.4.3 2.1-.1.9 1 1.2 2.4 1.1 1.2-.1 2.2.6 3.2.4.9-.1 1.3-.7 1.4-1.2h2.1c.3.8 1 1.4 2.1 1.3 1.3-.1 2-1 3.1-1.7 1-.6 1.9-.9 1.8-1.7 0-.6-.7-.9-.9-1.5-.2-.5.1-1.3-.4-1.9.2-1.6-.6-3.4-1.6-4.8-.9-1.3-2.1-2.4-2.1-4.3 0-2.4-1-4.6-3.1-4.6Zm-1.4 3.6c.5 0 .8.6.8 1.2 0 .3-.1.5-.2.7l-.6-.2c.1-.1.1-.3.1-.5 0-.3-.1-.5-.3-.5-.2 0-.3.3-.3.6v.2l-.6-.3v-.2c0-.6.4-1 1.1-1Zm2.6 0c.6 0 1.1.5 1.1 1.2 0 .3-.1.5-.2.7l-.4-.2c.1-.1.1-.3.1-.5 0-.4-.2-.7-.5-.7s-.5.3-.5.7v.3l-.6-.2c0-.2-.1-.3-.1-.5 0-.4.5-.8 1.1-.8Zm-1.4 1.9c.6 0 1.4.4 2 .7.4.2.5.4.3.6-.3.4-1.5 1.1-2.4 1.1-.8 0-1.3-.5-1.8-.8-.2-.2-.5-.4-.4-.7.2-.4 1.3-1 2.3-.9Zm-3.3 4.9c.1.1.1.3 0 .4-.5 1.2-1.3 2.6-1.1 4.1.1.8.4 1.4.9 1.8-.3.2-.8.2-1 0-.5-.4-.5-1.4-.4-2.3.2-1.5 1-2.8 1.6-4Zm6.7.3c.6 1 1.3 2.4 1.3 3.8 0 .4-.1.8-.2 1.1-.4.1-.8.3-1.1.6-.1-1.6-.8-3.6-1.4-4.6.5-.2 1-.5 1.4-.9Z"/></symbol>
     <symbol id="i-gh" viewBox="0 0 24 24"><path fill="currentColor" d="M12 2a10 10 0 0 0-3.2 19.5c.5.1.7-.2.7-.5v-1.7c-2.8.6-3.4-1.3-3.4-1.3-.4-1.2-1.1-1.5-1.1-1.5-.9-.6.1-.6.1-.6 1 .1 1.5 1 1.5 1 .9 1.6 2.4 1.1 3 .9.1-.7.4-1.1.6-1.4-2.2-.3-4.6-1.1-4.6-5 0-1.1.4-2 1-2.7-.1-.3-.4-1.3.1-2.7 0 0 .8-.3 2.8 1a9.6 9.6 0 0 1 5 0c1.9-1.3 2.8-1 2.8-1 .5 1.4.2 2.4.1 2.7.6.7 1 1.6 1 2.7 0 3.9-2.3 4.7-4.6 5 .4.3.7.9.7 1.9V21c0 .3.2.6.7.5A10 10 0 0 0 12 2Z"/></symbol>
-    <symbol id="i-dl" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M12 3v12m0 0-5-5m5 5 5-5M4 19h16"/></symbol>
-    <symbol id="i-pipe" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M6 3v12M6 15a3 3 0 1 0 0 6 3 3 0 0 0 0-6Zm12-6a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm0 0c0 6-12 3-12 9"/></symbol>
   </svg>
 
   <header class="nav">
@@ -439,7 +390,6 @@
         <a href="#que-hace">Qué hace</a>
         <a href="#como">Cómo funciona</a>
         <a href="#resultados">Resultados</a>
-        <a href="#descargas">Descargas</a>
         <a href="#cli">CLI y CI</a>
       </nav>
       <a class="btn btn-ghost btn-sm gh" href="https://github.com/smalbach/eq-studio"><svg><use href="#i-gh"/></svg>GitHub</a>
@@ -458,10 +408,9 @@
           <h1>Un 200 no es un <em>test que pasa</em>.</h1>
           <p class="lead">Endpoint Quality verifica cualquier API HTTP contra su contrato OpenAPI: status, schema, autenticación 401/403, persistencia real de lo que se escribe y flujos encadenados. Y la somete a carga, estrés, pico y resistencia.</p>
           <div class="cta">
-            <a class="btn btn-primary" id="hero-dl" href="#descargas"><svg><use href="#i-dl"/></svg><span>Descargar</span></a>
-            <a class="btn btn-ghost" href="#descargas">Todas las plataformas</a>
+            <a class="btn btn-primary" href="https://github.com/smalbach/eq-studio"><svg><use href="#i-gh"/></svg><span>Ver en GitHub</span></a>
           </div>
-          <p class="cta-note" id="hero-note">Gratis y de código abierto. Tus datos se quedan en tu equipo.</p>
+          <p class="cta-note">Gratis y de código abierto. Tus datos se quedan en tu equipo.</p>
         </div>
 
         <div class="stage" id="stage" role="img" aria-label="Animación de una corrida: 186 casos esperan en una cola, varios hilos toman cada uno el siguiente caso, lo envían a su endpoint y vuelven con el resultado; 184 pasan, uno falla por el schema y uno supera el presupuesto de latencia">
@@ -667,72 +616,11 @@
       </div>
     </section>
 
-    <section class="alt" id="descargas">
-      <div class="wrap">
-        <h2>Descargas</h2>
-        <p class="section-lead">La app de escritorio trae todo dentro: no necesitas Node ni terminal. Cada instalador sale del pipeline de release en GitHub Actions, construido en su propio sistema operativo.</p>
-        <div class="release-bar">
-          <span id="release-info">Buscando la última versión…</span>
-          <a href="https://github.com/smalbach/eq-studio/releases">Todas las versiones y notas →</a>
-        </div>
-
-        <div class="grid grid-3">
-          <article class="card dl-card" data-os="windows">
-            <span class="tag-current">Tu sistema</span>
-            <div class="dl-head"><svg><use href="#i-win"/></svg><div><h3>Windows</h3><small>Windows 10 y 11 · x64</small></div></div>
-            <ul class="dl-list">
-              <li><a class="primary" data-asset="win-exe" href="https://github.com/smalbach/eq-studio/releases/latest"><span>Instalador (.exe)</span><span class="meta">x64</span></a></li>
-            </ul>
-            <p class="dl-hint">Si SmartScreen avisa, elige «Más información» → «Ejecutar de todas formas».</p>
-            <div class="pipe">
-              <a data-job="desktop windows-x64" href="https://github.com/smalbach/eq-studio/actions/workflows/release.yml"><svg width="15" height="15"><use href="#i-pipe"/></svg>Pipeline windows-x64</a>
-              <span class="status" data-status><span class="dot"></span><span>—</span></span>
-            </div>
-          </article>
-
-          <article class="card dl-card" data-os="mac">
-            <span class="tag-current">Tu sistema</span>
-            <div class="dl-head"><svg><use href="#i-mac"/></svg><div><h3>macOS</h3><small>Apple Silicon e Intel</small></div></div>
-            <ul class="dl-list">
-              <li><a class="primary" data-asset="mac-arm64" href="https://github.com/smalbach/eq-studio/releases/latest"><span>Apple Silicon (.dmg)</span><span class="meta">arm64</span></a></li>
-              <li><a data-asset="mac-x64" href="https://github.com/smalbach/eq-studio/releases/latest"><span>Intel (.dmg)</span><span class="meta">x64</span></a></li>
-            </ul>
-            <p class="dl-hint">Firma ad hoc: la primera vez, clic derecho sobre la app → «Abrir».</p>
-            <div class="pipe">
-              <a data-job="desktop macos-arm64" href="https://github.com/smalbach/eq-studio/actions/workflows/release.yml"><svg width="15" height="15"><use href="#i-pipe"/></svg>Pipeline macos</a>
-              <span class="status" data-status><span class="dot"></span><span>—</span></span>
-            </div>
-          </article>
-
-          <article class="card dl-card" data-os="linux">
-            <span class="tag-current">Tu sistema</span>
-            <div class="dl-head"><svg><use href="#i-linux"/></svg><div><h3>Linux</h3><small>x64 · AppImage y Debian/Ubuntu</small></div></div>
-            <ul class="dl-list">
-              <li><a class="primary" data-asset="linux-appimage" href="https://github.com/smalbach/eq-studio/releases/latest"><span>AppImage</span><span class="meta">x86_64</span></a></li>
-              <li><a data-asset="linux-deb" href="https://github.com/smalbach/eq-studio/releases/latest"><span>Paquete .deb</span><span class="meta">amd64</span></a></li>
-            </ul>
-            <p class="dl-hint"><code>chmod +x</code> al AppImage, o <code>sudo apt install ./endpoint-quality-*.deb</code>.</p>
-            <div class="pipe">
-              <a data-job="desktop linux-x64" href="https://github.com/smalbach/eq-studio/actions/workflows/release.yml"><svg width="15" height="15"><use href="#i-pipe"/></svg>Pipeline linux-x64</a>
-              <span class="status" data-status><span class="dot"></span><span>—</span></span>
-            </div>
-          </article>
-        </div>
-      </div>
-    </section>
-
     <section id="cli">
       <div class="wrap cli">
         <div>
           <h2>También en la terminal y en tu CI</h2>
-          <p class="section-lead" style="margin-bottom:0">La CLI <code>eq</code> corre los mismos proyectos sin servidor. Sale con <code>0</code> si todo pasó y <code>1</code> si algún caso falló, y escribe JUnit, HTML y SARIF. Binarios de un solo archivo, sin Node:</p>
-          <div class="chips" id="cli-chips">
-            <a class="chip" data-asset="cli-darwin-arm64" href="https://github.com/smalbach/eq-studio/releases/latest">macOS arm64</a>
-            <a class="chip" data-asset="cli-darwin-x64" href="https://github.com/smalbach/eq-studio/releases/latest">macOS x64</a>
-            <a class="chip" data-asset="cli-win32-x64" href="https://github.com/smalbach/eq-studio/releases/latest">Windows x64</a>
-            <a class="chip" data-asset="cli-linux-x64" href="https://github.com/smalbach/eq-studio/releases/latest">Linux x64</a>
-            <a class="chip" data-asset="cli-linux-arm64" href="https://github.com/smalbach/eq-studio/releases/latest">Linux arm64</a>
-          </div>
+          <p class="section-lead" style="margin-bottom:0">La CLI <code>eq</code> corre los mismos proyectos sin servidor. Sale con <code>0</code> si todo pasó y <code>1</code> si algún caso falló, y escribe JUnit, HTML y SARIF.</p>
         </div>
         <div class="term">
           <div class="term-bar"><span></span><span></span><span></span><b>sin instalar nada</b></div>
@@ -756,7 +644,6 @@
       <span>Endpoint Quality · Licencia MIT</span>
       <nav aria-label="Enlaces">
         <a href="https://github.com/smalbach/eq-studio">Código</a>
-        <a href="https://github.com/smalbach/eq-studio/releases">Releases</a>
         <a href="https://github.com/smalbach/eq-studio/actions">Pipelines</a>
         <a href="https://github.com/smalbach/eq-studio/blob/main/CONTRIBUTING.md">Contribuir</a>
         <a href="https://github.com/smalbach/eq-studio/blob/main/SECURITY.md">Seguridad</a>
@@ -765,9 +652,6 @@
   </footer>
 
   <script>
-    const REPO = "smalbach/eq-studio";
-    const API = "https://api.github.com/repos/" + REPO;
-
     // Theme toggle; the choice is a per-viewer convenience, so storage failures are ignored.
     const root = document.documentElement;
     try { const t = localStorage.getItem("eq-theme"); if (t) root.dataset.theme = t; } catch {}
@@ -777,88 +661,6 @@
       try { localStorage.setItem("eq-theme", root.dataset.theme); } catch {}
     });
 
-    // Asset names come from apps/desktop/electron-builder.yml (endpoint-quality-<version>-<os>-<arch>.<ext>)
-    // and apps/cli/scripts/sea.mjs (eq-<macos|windows|linux>-<arch>[.exe]).
-    const PATTERNS = {
-      "win-exe": /-win-x64\.exe$/,
-      "mac-arm64": /-mac-arm64\.dmg$/,
-      "mac-x64": /-mac-x64\.dmg$/,
-      "linux-appimage": /-linux-.*\.AppImage$/,
-      "linux-deb": /-linux-.*\.deb$/,
-      "cli-darwin-arm64": /^eq-macos-arm64$/,
-      "cli-darwin-x64": /^eq-macos-x64$/,
-      "cli-win32-x64": /^eq-windows-x64\.exe$/,
-      "cli-linux-x64": /^eq-linux-x64$/,
-      "cli-linux-arm64": /^eq-linux-arm64$/,
-    };
-
-    function detectOS() {
-      const p = (navigator.userAgentData?.platform || navigator.platform || navigator.userAgent).toLowerCase();
-      if (p.includes("win")) return "windows";
-      if (p.includes("mac")) return "mac";
-      if (p.includes("linux") && !/android/i.test(navigator.userAgent)) return "linux";
-      return null;
-    }
-
-    const size = (b) => b > 1e6 ? (b / 1048576).toFixed(0) + " MB" : (b / 1024).toFixed(0) + " KB";
-
-    const os = detectOS();
-    const heroBtn = document.getElementById("hero-dl");
-    const OS_LABEL = { windows: "Descargar para Windows", mac: "Descargar para macOS", linux: "Descargar para Linux" };
-    if (os) {
-      document.querySelector(`.dl-card[data-os="${os}"]`)?.classList.add("current");
-      heroBtn.querySelector("span").textContent = OS_LABEL[os];
-    }
-
-    async function loadRelease() {
-      const info = document.getElementById("release-info");
-      try {
-        const res = await fetch(API + "/releases/latest", { headers: { Accept: "application/vnd.github+json" } });
-        if (!res.ok) throw new Error(res.status);
-        const rel = await res.json();
-        const date = new Date(rel.published_at).toLocaleDateString("es", { day: "numeric", month: "long", year: "numeric" });
-        info.innerHTML = `Última versión: <strong>${rel.tag_name}</strong> · ${date}`;
-        for (const el of document.querySelectorAll("[data-asset]")) {
-          const asset = rel.assets.find((a) => PATTERNS[el.dataset.asset].test(a.name));
-          if (!asset) continue;
-          el.href = asset.browser_download_url;
-          el.title = asset.name;
-          const meta = el.querySelector(".meta");
-          if (meta) meta.textContent = size(asset.size);
-        }
-        // The hero button goes straight to the visitor's installer when there is one.
-        const firstForOS = os && document.querySelector(`.dl-card[data-os="${os}"] a.primary`);
-        if (firstForOS && firstForOS.href.includes("/download/")) heroBtn.href = firstForOS.href;
-        if (os === "mac" && firstForOS) document.getElementById("hero-note").textContent = "Apple Silicon. ¿Mac con Intel? Está en Descargas.";
-      } catch {
-        info.textContent = "Aún no hay una versión publicada: los enlaces abren la página de releases.";
-      }
-    }
-
-    async function loadPipelines() {
-      try {
-        const runs = await fetch(API + "/actions/workflows/release.yml/runs?per_page=1&exclude_pull_requests=true").then((r) => r.ok ? r.json() : Promise.reject());
-        const run = runs.workflow_runs?.[0];
-        if (!run) {
-          for (const s of document.querySelectorAll("[data-status] span:last-child")) s.textContent = "sin builds aún";
-          return;
-        }
-        const jobs = await fetch(run.jobs_url + "?per_page=50").then((r) => r.ok ? r.json() : Promise.reject());
-        for (const link of document.querySelectorAll("[data-job]")) {
-          const job = jobs.jobs?.find((j) => j.name === link.dataset.job);
-          const status = link.closest(".pipe").querySelector("[data-status]");
-          const target = job || run;
-          link.href = target.html_url;
-          const state = target.status !== "completed" ? "run" : target.conclusion === "success" ? "ok" : "fail";
-          status.querySelector(".dot").className = "dot " + state;
-          status.querySelector("span:last-child").textContent =
-            state === "run" ? "en curso" : state === "ok" ? "build ok · " + run.head_branch : "falló";
-        }
-      } catch { /* the links keep pointing at the workflow page */ }
-    }
-
-    loadRelease();
-    loadPipelines();
   </script>
   <script>
     // Animations. No libraries: the hosted page's CSP allows only its own inline scripts.

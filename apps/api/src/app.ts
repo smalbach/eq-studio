@@ -91,13 +91,12 @@ function serveWebApp(app: NestExpressApplication, directory: string | undefined,
  * The landing page (site/, copied by the bundle into web/download/), so a hosted deployment needs
  * no second service for it. In cloud mode it is the root and the app lives at /app/ (the app routes
  * by its query string, so any path serves it); an old link to `/?…` still reaches the app. Locally
- * the app keeps the root and the page is at /download/. Its own policy: it loads Google Fonts and
- * reads the latest release from the GitHub API.
+ * the app keeps the root and the page is at /download/. Its own policy: it loads Google Fonts.
  */
 function serveLanding(app: NestExpressApplication, index: string, atRoot: boolean) {
   if (!existsSync(index)) return;
   const page = readFileSync(index, "utf8");
-  const policy = ["default-src 'self'", `script-src 'self' ${inlineScriptHashes(page).join(" ")}`, "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com", "img-src 'self' data:", "font-src 'self' https://fonts.gstatic.com", "connect-src 'self' https://api.github.com", "frame-ancestors 'none'", "base-uri 'self'", "form-action 'self'", "object-src 'none'"].join("; ");
+  const policy = ["default-src 'self'", `script-src 'self' ${inlineScriptHashes(page).join(" ")}`, "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com", "img-src 'self' data:", "font-src 'self' https://fonts.gstatic.com", "connect-src 'self'", "frame-ancestors 'none'", "base-uri 'self'", "form-action 'self'", "object-src 'none'"].join("; ");
   const html = page
     .replace("<!-- app-link: the hosted app puts its sign-in link here -->", `<a class="btn btn-primary btn-sm" href="${atRoot ? "/app/" : "/"}">Abrir la app</a>`)
     .replaceAll('"icon.svg"', '"/download/icon.svg"');
