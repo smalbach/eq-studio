@@ -84,8 +84,9 @@
     }
     a { color: var(--accent); }
     code, pre, .mono { font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace; }
-    .wrap { max-width: 1120px; margin: 0 auto; padding: 0 16px; }
+    .wrap { max-width: 1480px; margin: 0 auto; padding: 0 16px; }
     @media (min-width: 720px) { .wrap { padding: 0 32px; } }
+    @media (min-width: 1280px) { .wrap { padding: 0 48px; } }
 
     /* Nav */
     header.nav {
@@ -119,8 +120,13 @@
     /* Hero */
     .hero { padding: 64px 0 48px; overflow: hidden; }
     .hero .wrap { display: grid; gap: 48px; align-items: center; }
-    .hero-copy { max-width: 760px; }
-    @media (min-width: 960px) { .hero .wrap { gap: 40px; } .hero { padding: 88px 0 72px; } }
+    .hero-copy { max-width: 760px; min-width: 0; }
+    @media (min-width: 960px) { .hero .wrap { gap: 40px; } .hero { padding: 72px 0 80px; } }
+    @media (min-width: 1200px) {
+      .hero .wrap { grid-template-columns: minmax(380px, 0.78fr) 1.22fr; gap: 56px; }
+      .hero h1 { font-size: clamp(46px, 4.3vw, 70px); }
+      .hero .lead { font-size: 19px; }
+    }
     .eyebrow {
       display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600;
       color: var(--accent); background: var(--accent-soft); padding: 5px 12px; border-radius: 999px;
@@ -144,9 +150,11 @@
 
     /* Sections */
     section { padding: 72px 0; }
+    @media (min-width: 960px) { section { padding: 104px 0; } }
     section.alt { background: var(--bg-alt); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
     h2 { font-size: clamp(28px, 4vw, 38px); letter-spacing: -0.02em; line-height: 1.15; margin: 0 0 12px; }
-    .section-lead { color: var(--muted); max-width: 640px; margin: 0 0 40px; font-size: 17px; }
+    .section-lead { color: var(--muted); max-width: 760px; margin: 0 0 40px; font-size: 17px; }
+    @media (min-width: 960px) { .section-lead { font-size: 19px; margin-bottom: 48px; } h2 { font-size: clamp(34px, 3.4vw, 48px); } }
 
     .grid { display: grid; gap: 16px; }
     @media (min-width: 640px) { .grid-2, .grid-3 { grid-template-columns: repeat(2, 1fr); } }
@@ -231,7 +239,7 @@
 
     /* Hero: the run as it happens, full width under the headline */
     .stage {
-      position: relative; min-width: 0; width: 100%; height: clamp(500px, 46vw, 600px);
+      position: relative; min-width: 0; width: 100%; height: clamp(500px, 44vw, 660px);
       border-radius: 22px; border: 1px solid var(--border); overflow: hidden; box-shadow: var(--shadow);
       background: radial-gradient(70% 90% at 55% 45%, var(--accent-soft), transparent 70%), var(--surface);
     }
@@ -904,9 +912,9 @@
       function layout() {
         const narrow = W < 640, workers = narrow ? 8 : 12;
         const top = narrow ? 70 : 80, bottom = H - (narrow ? 100 : 74);
-        const qx = narrow ? 12 : 18, qw = narrow ? 34 : 150, qh = narrow ? 15 : 22, qgap = narrow ? 5 : 6;
-        const wx = narrow ? qx + qw + 30 : qx + qw + 92;
-        const ew = narrow ? 156 : 228, eh = narrow ? 22 : 30, ex = W - ew - (narrow ? 10 : 18);
+        const qx = narrow ? 12 : 18, qw = narrow ? 34 : W < 820 ? 112 : 150, qh = narrow ? 15 : 22, qgap = narrow ? 5 : 6;
+        const wx = narrow ? qx + qw + 30 : qx + qw + (W < 820 ? 72 : 92);
+        const ew = narrow ? 156 : W < 820 ? 200 : 228, eh = narrow ? 22 : 30, ex = W - ew - (narrow ? 10 : 18);
         const ys = (i, n, a, b) => a + (b - a) * (n === 1 ? 0.5 : i / (n - 1));
         L = { narrow, workers, top, bottom, qx, qw, qh, qgap, wx, ew, eh, ex,
           wy: Array.from({ length: workers }, (_, i) => ys(i, workers, top + 8, bottom - 8)),
