@@ -119,7 +119,8 @@
     /* Hero */
     .hero { padding: 64px 0 48px; overflow: hidden; }
     .hero .wrap { display: grid; gap: 48px; align-items: center; }
-    @media (min-width: 960px) { .hero .wrap { grid-template-columns: 1.05fr 1fr; } .hero { padding: 96px 0 72px; } }
+    .hero-copy { max-width: 760px; }
+    @media (min-width: 960px) { .hero .wrap { gap: 40px; } .hero { padding: 88px 0 72px; } }
     .eyebrow {
       display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600;
       color: var(--accent); background: var(--accent-soft); padding: 5px 12px; border-radius: 999px;
@@ -227,6 +228,190 @@
 
     .theme-toggle { background: none; border: 1px solid var(--border); color: var(--muted); border-radius: 8px; width: 34px; height: 34px; cursor: pointer; display: grid; place-items: center; }
     .theme-toggle svg { width: 16px; height: 16px; }
+
+    /* Hero: the run as it happens, full width under the headline */
+    .stage {
+      position: relative; min-width: 0; width: 100%; height: clamp(500px, 46vw, 600px);
+      border-radius: 22px; border: 1px solid var(--border); overflow: hidden; box-shadow: var(--shadow);
+      background: radial-gradient(70% 90% at 55% 45%, var(--accent-soft), transparent 70%), var(--surface);
+    }
+    @media (max-width: 639px) { .stage { height: 540px; } }
+    .stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+    .hud { position: absolute; left: 14px; right: 14px; display: flex; gap: 8px; pointer-events: none; font-size: 12px; }
+    .hud-top { top: 14px; justify-content: space-between; }
+    .hud-bottom { bottom: 16px; justify-content: space-between; align-items: flex-end; }
+    @media (max-width: 639px) { .hud { font-size: 11px; left: 10px; right: 10px; } .hud-top .hud-pill { white-space: nowrap; padding: 5px 9px; } .hud-bottom { flex-direction: column; align-items: stretch; } .hud-counts { align-self: flex-start; } }
+    .hud-pill {
+      display: inline-flex; align-items: center; gap: 8px; padding: 6px 11px; border-radius: 999px; min-width: 0;
+      background: color-mix(in srgb, var(--surface) 82%, transparent); border: 1px solid var(--border);
+      backdrop-filter: blur(6px); color: var(--muted);
+    }
+    .hud-case { border-radius: 10px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
+    .hud-case .g, .hud-counts .g { font-weight: 700; }
+    .hud-counts { gap: 14px; color: var(--text); flex: none; }
+    .g-ok { color: var(--ok); } .g-fail { color: var(--fail); } .g-warn { color: var(--warn); }
+    .live { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); animation: live 1.6s infinite; flex: none; }
+    @keyframes live { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--ok) 55%, transparent); } 100% { box-shadow: 0 0 0 8px transparent; } }
+
+    /* How a test runs */
+    .flow-steps { list-style: none; margin: 0 0 16px; padding: 0; display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+    .flow-steps button {
+      width: 100%; height: 100%; display: flex; flex-direction: column; align-items: flex-start; gap: 8px; padding: 12px;
+      border-radius: 12px; border: 1px solid var(--border); background: var(--surface); color: var(--muted);
+      font: inherit; font-size: 13.5px; font-weight: 600; line-height: 1.3; cursor: pointer; text-align: left; position: relative; overflow: hidden;
+      transition: border-color .2s, color .2s, box-shadow .2s;
+    }
+    .flow-steps button:hover { border-color: var(--accent); }
+    .flow-steps .n {
+      width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font-size: 12px;
+      background: var(--bg); border: 1px solid var(--border); color: var(--text); transition: background .2s, color .2s;
+    }
+    .flow-steps button.active { border-color: var(--accent); color: var(--text); box-shadow: 0 0 0 3px var(--accent-soft); }
+    .flow-steps button.active .n { background: var(--accent-strong); color: var(--on-accent); border-color: transparent; }
+    .flow-steps button.done .n { background: var(--accent-soft); color: var(--accent); border-color: transparent; }
+    .flow-steps .bar { position: absolute; left: 0; bottom: 0; height: 3px; width: 0; background: var(--accent); }
+    .flow-steps button.done .bar { width: 100%; opacity: .35; }
+    .flow-steps button.active .bar { animation: fill var(--dur, 4s) linear forwards; }
+    .flow.paused .flow-steps button.active .bar { animation: none; width: 100%; }
+    @keyframes fill { to { width: 100%; } }
+    @media (max-width: 639px) {
+      .flow-steps .label { display: none; }
+      .flow-steps button { align-items: center; padding: 10px 6px; }
+    }
+    .flow-body { display: grid; gap: 16px; }
+    @media (min-width: 900px) { .flow-body { grid-template-columns: 1.1fr 1fr; } }
+    .flow-panel { min-height: 330px; }
+    .fv { display: none; }
+    .fv.active { display: block; }
+    .fv h3 { margin: 0 0 4px; font-size: 18px; }
+    .fv > p { margin: 0 0 16px; color: var(--muted); font-size: 15px; }
+    .rv { opacity: 0; transform: translateY(6px); }
+    .fv.active .rv { animation: rv .45s ease forwards; animation-delay: calc(var(--i, 0) * 200ms + 120ms); }
+    @keyframes rv { to { opacity: 1; transform: none; } }
+    .code {
+      background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px;
+      font-size: 13px; line-height: 1.75; overflow-x: auto; margin: 0; white-space: pre;
+    }
+    .code .k { color: var(--accent); } .code .c { color: var(--muted); }
+    .code .rv { display: block; }
+    .cases { display: flex; flex-wrap: wrap; gap: 8px; }
+    .case { font: 12.5px/1.4 "JetBrains Mono", monospace; padding: 7px 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); color: var(--text); }
+    .case b { color: var(--accent); font-weight: 500; }
+    .fine { font-size: 13px; color: var(--muted); margin: 14px 0 0; }
+    .wire { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
+    .wire .pill { font: 12px "JetBrains Mono", monospace; padding: 6px 10px; border-radius: 999px; border: 1px solid var(--border); background: var(--bg); white-space: nowrap; }
+    .wire .line { flex: 1; height: 2px; position: relative; background: repeating-linear-gradient(90deg, var(--border) 0 6px, transparent 6px 12px); }
+    .wire .pkt { position: absolute; top: 50%; left: 0; width: 10px; height: 10px; border-radius: 50%; background: var(--accent); transform: translate(-50%, -50%); box-shadow: 0 0 12px var(--accent); }
+    .fv.active .wire .pkt { animation: pkt 1.8s ease-in-out infinite; }
+    @keyframes pkt { 0% { left: 0; } 45%, 55% { left: 100%; } 100% { left: 0; } }
+    .verdicts { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+    .verdicts li {
+      display: grid; grid-template-columns: 22px 1fr auto; gap: 8px; align-items: center; font-size: 13.5px;
+      padding: 9px 12px; border-radius: 10px; border: 1px solid var(--border); background: var(--bg);
+    }
+    .verdicts li > span:last-child { color: var(--muted); font-size: 12.5px; text-align: right; }
+    .verdicts .g { font-weight: 700; text-align: center; }
+    .verdicts li.bad { border-color: color-mix(in srgb, var(--fail) 45%, var(--border)); }
+    .flow-term { min-height: 330px; display: flex; flex-direction: column; }
+    .flow-term pre { flex: 1; }
+    .flow-term .ln { display: block; animation: rv .3s ease forwards; opacity: 0; }
+    .caret { display: inline-block; width: 8px; height: 15px; background: #3ddba9; vertical-align: -2px; animation: blink 1s steps(1) infinite; }
+    @keyframes blink { 50% { opacity: 0; } }
+    .steps-title { margin: 56px 0 16px; font-size: 20px; }
+
+    /* Example results */
+    .charts { display: grid; gap: 16px; }
+    @media (min-width: 900px) { .charts { grid-template-columns: 1fr 1fr; } .charts .wide { grid-column: 1 / -1; } }
+    .chart-card h3 { margin: 0 0 2px; font-size: 17px; }
+    .chart-card .sub { margin: 0 0 18px; color: var(--muted); font-size: 14px; }
+    .kpis { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 20px; }
+    .kpi { border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; background: var(--bg); }
+    .kpi b { display: block; font-size: 28px; line-height: 1.1; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+    .kpi span { font-size: 13px; color: var(--muted); display: inline-flex; gap: 6px; align-items: center; }
+    .hbars { display: flex; flex-direction: column; gap: 10px; }
+    .hbar { display: grid; grid-template-columns: 112px 1fr 44px; gap: 10px; align-items: center; font-size: 13px; }
+    .hbar .lbl { color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .hbar .val { text-align: right; font-variant-numeric: tabular-nums; }
+    .hbar .track { height: 12px; position: relative; }
+    .hbar .fillb { position: absolute; inset: 0 auto 0 0; width: 0; border-radius: 0 4px 4px 0; background: var(--accent); transition: width .9s cubic-bezier(.2, .8, .2, 1); }
+    .hbar .fillb.warn { background: var(--warn); } .hbar .fillb.fail { background: var(--fail); }
+    .hbar .budget { position: absolute; top: -4px; bottom: -4px; width: 2px; border-radius: 1px; background: var(--text); opacity: .55; }
+    .hbar.mono-lbl { grid-template-columns: minmax(0, 150px) 1fr 40px; }
+    @media (max-width: 479px) { .hbar, .hbar.mono-lbl { grid-template-columns: 104px 1fr 40px; } }
+    .hbar.mono-lbl .lbl { font-family: "JetBrains Mono", monospace; font-size: 12px; }
+    .hbar .note { color: var(--fail); font-size: 12px; }
+    .legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 13px; color: var(--muted); margin: 14px 0 0; }
+    .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+    .legend i.line { height: 2px; border-radius: 1px; vertical-align: 3px; width: 14px; }
+    .svgchart { width: 100%; display: block; overflow: visible; }
+    .svgchart text { fill: var(--muted); font: 11.5px Inter, system-ui, sans-serif; }
+    .svgchart .grid line { stroke: var(--border); }
+    .svgchart .phase-label { fill: var(--muted); font-size: 11px; font-weight: 600; }
+    .stress { display: flex; flex-direction: column; gap: 6px; position: relative; }
+    .stress h4 { margin: 8px 0 0; font-size: 13px; font-weight: 600; color: var(--text); }
+    .tip {
+      position: fixed; z-index: 50; pointer-events: none; opacity: 0; transition: opacity .12s;
+      background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 10px;
+      box-shadow: var(--shadow); padding: 8px 11px; font-size: 12.5px; line-height: 1.5; min-width: 140px;
+    }
+    .tip.on { opacity: 1; }
+    .tip b { font-variant-numeric: tabular-nums; }
+    .tip .row { display: flex; justify-content: space-between; gap: 14px; }
+    .tip .row span:first-child { color: var(--muted); }
+    .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+    /* Live views: one run shown as a terminal, as contract-to-cases and as a dashboard */
+    .views-tabs { display: inline-flex; gap: 4px; padding: 4px; border-radius: 12px; background: var(--surface); border: 1px solid var(--border); margin-bottom: 18px; flex-wrap: wrap; }
+    .views-tabs button { font: 600 14px/1 Inter, system-ui, sans-serif; color: var(--muted); background: none; border: 0; padding: 10px 14px; border-radius: 9px; cursor: pointer; }
+    .views-tabs button[aria-selected="true"] { background: var(--accent-soft); color: var(--accent); }
+    .views-tabs button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+    .view { height: 400px; }
+    .view[hidden] { display: none; }
+    .view .term { height: 100%; display: flex; flex-direction: column; }
+    .view .term pre { flex: 1; overflow: hidden; }
+    .lv-split { display: grid; grid-template-columns: 1fr 1.15fr; gap: 16px; height: 100%; }
+    .lv-spec { margin: 0; padding: 14px; border-radius: 14px; background: var(--term-bg); border: 1px solid #1d2d28; color: #6f877f; font: 12.5px/1.75 "JetBrains Mono", monospace; overflow: hidden; }
+    .lv-spec div { padding: 0 8px; border-radius: 5px; white-space: pre; transition: background .3s, color .3s; }
+    .lv-spec div.on { background: rgb(47 208 161 / 16%); color: var(--term-text); }
+    .lv-spec .k { color: #7cc4f0; }
+    .lv-cases { display: flex; flex-direction: column; gap: 8px; overflow: hidden; }
+    .lv-case { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: 10px; background: var(--surface); border: 1px solid var(--border);
+      font: 12.5px "JetBrains Mono", monospace; opacity: 0; transform: translateX(14px); transition: opacity .35s, transform .35s; }
+    .lv-case.in { opacity: 1; transform: none; }
+    .lv-case .st { width: 22px; height: 22px; border-radius: 6px; display: grid; place-items: center; font-weight: 700; flex: none; background: var(--bg-alt); border: 1px solid var(--border); color: var(--muted); }
+    .lv-case.ok .st { color: var(--ok); border-color: var(--ok); }
+    .lv-case.fail .st { color: var(--fail); border-color: var(--fail); }
+    .lv-case.warn .st { color: var(--warn); border-color: var(--warn); }
+    .lv-case .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .lv-case .ds { color: var(--muted); font-size: 11.5px; white-space: nowrap; }
+    .lv-dash { display: grid; grid-template-rows: auto 1fr; gap: 14px; height: 100%; }
+    .lv-kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+    .lv-kpi { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; }
+    .lv-kpi b { display: block; font: 800 28px/1.1 Inter, sans-serif; font-variant-numeric: tabular-nums; }
+    .lv-kpi span { font-size: 12.5px; color: var(--muted); }
+    .lv-panel { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+    .lv-panel h3 { margin: 0 0 2px; font-size: 13px; color: var(--muted); font-weight: 600; }
+    .lv-bar { display: grid; grid-template-columns: 170px 1fr 52px; gap: 12px; align-items: center; font: 12px "JetBrains Mono", monospace; }
+    .lv-bar .lbl { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .lv-bar .trk { position: relative; height: 10px; }
+    .lv-bar .fill { position: absolute; left: 0; top: 0; bottom: 0; width: 0; border-radius: 0 4px 4px 0; background: var(--accent); transition: width 1s cubic-bezier(.2,.8,.2,1); }
+    .lv-bar.over .fill { background: var(--warn); }
+    .lv-bar .bud { position: absolute; top: -3px; bottom: -3px; width: 2px; background: var(--text); opacity: .5; }
+    .lv-bar .v { text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; }
+    @media (max-width: 640px) {
+      .view { height: 440px; }
+      .lv-split { grid-template-columns: 1fr; } .lv-spec { display: none; }
+      .lv-kpis { grid-template-columns: repeat(2, 1fr); gap: 8px; } .lv-kpi b { font-size: 22px; }
+      .lv-bar { grid-template-columns: 104px 1fr 44px; gap: 8px; font-size: 11px; }
+      .view .term pre { font-size: 11px; padding: 12px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .lv-case, .lv-bar .fill, .lv-spec div { transition: none; }
+      .rv, .flow-term .ln { opacity: 1; transform: none; animation: none !important; }
+      .fv.active .wire .pkt, .live, .caret { animation: none; }
+      .hbar .fillb { transition: none; }
+    }
   </style>
 </head>
 <body>
@@ -245,6 +430,7 @@
       <nav class="nav-links" aria-label="Secciones">
         <a href="#que-hace">Qué hace</a>
         <a href="#como">Cómo funciona</a>
+        <a href="#resultados">Resultados</a>
         <a href="#descargas">Descargas</a>
         <a href="#cli">CLI y CI</a>
       </nav>
@@ -259,7 +445,7 @@
   <main>
     <div class="hero">
       <div class="wrap">
-        <div>
+        <div class="hero-copy">
           <span class="eyebrow">Open source · MIT · Windows, macOS y Linux</span>
           <h1>Un 200 no es un <em>test que pasa</em>.</h1>
           <p class="lead">Endpoint Quality verifica cualquier API HTTP contra su contrato OpenAPI: status, schema, autenticación 401/403, persistencia real de lo que se escribe y flujos encadenados. Y la somete a carga, estrés, pico y resistencia.</p>
@@ -270,23 +456,20 @@
           <p class="cta-note" id="hero-note">Gratis y de código abierto. Tus datos se quedan en tu equipo.</p>
         </div>
 
-        <div class="term" role="img" aria-label="Ejemplo de una corrida de eq en la terminal">
-          <div class="term-bar"><span></span><span></span><span></span><b>eq run — mock-store</b></div>
-<pre><span class="t-dim">$</span> <span class="t-cmd">eq run --file store.eq.json --env staging</span>
-<span class="t-dim">Contrato  openapi 3.1 · 24 operaciones · 186 casos</span>
-
-  <span class="t-ok">✓</span> GET    /products              <span class="t-dim">200  schema ok   38ms</span>
-  <span class="t-ok">✓</span> GET    /products/{id}         <span class="t-dim">200  schema ok   21ms</span>
-  <span class="t-ok">✓</span> GET    /orders                <span class="t-dim">401  sin token   9ms</span>
-  <span class="t-ok">✓</span> GET    /orders                <span class="t-dim">403  read-token  11ms</span>
-  <span class="t-ok">✓</span> POST   /products              <span class="t-dim">201  persistió   44ms</span>
-  <span class="t-fail">✗</span> PATCH  /products/{id}         <span class="t-fail">200  price: string ≠ number</span>
-  <span class="t-ok">✓</span> POST   /products  <span class="t-dim">(falta name) 422  negativo   12ms</span>
-  <span class="t-warn">!</span> GET    /search                <span class="t-warn">p95 412ms &gt; presupuesto 300ms</span>
-  <span class="t-ok">✓</span> DELETE /products/{id}         <span class="t-dim">204  limpiado   17ms</span>
-
-<span class="t-ok">184 pasaron</span> · <span class="t-fail">1 falló</span> · <span class="t-warn">1 fuera de presupuesto</span>
-<span class="t-dim">→ eq-report.xml · report.html · results.sarif</span></pre>
+        <div class="stage" id="stage" role="img" aria-label="Animación de una corrida: 186 casos esperan en una cola, varios hilos toman cada uno el siguiente caso, lo envían a su endpoint y vuelven con el resultado; 184 pasan, uno falla por el schema y uno supera el presupuesto de latencia">
+          <canvas id="runners"></canvas>
+          <div class="hud hud-top" aria-hidden="true">
+            <span class="hud-pill mono"><span class="live"></span>eq run · store.eq.json</span>
+            <span class="hud-pill mono" id="hud-total">0 hilos · 0/186</span>
+          </div>
+          <div class="hud hud-bottom" aria-hidden="true">
+            <span class="hud-pill hud-case mono" id="hud-case">Leyendo el contrato · 186 casos en cola</span>
+            <span class="hud-pill hud-counts mono">
+              <span><span class="g g-ok">✓</span> <b id="n-ok">0</b></span>
+              <span><span class="g g-fail">✗</span> <b id="n-fail">0</b></span>
+              <span><span class="g g-warn">!</span> <b id="n-warn">0</b></span>
+            </span>
+          </div>
         </div>
       </div>
     </div>
@@ -332,8 +515,77 @@
 
     <section id="como">
       <div class="wrap">
-        <h2>De un contrato a una matriz en verde</h2>
-        <p class="section-lead">Sin escribir tests a mano. El orden de ejecución corre las lecturas primero y los DELETE al final, para que un borrado roto no contagie de rojo al resto.</p>
+        <h2>Así se ejecuta cada test</h2>
+        <p class="section-lead">Sin escribir tests a mano. Sigue una operación, <code>PATCH /products/{id}</code>, desde el contrato hasta el informe. El orden corre las lecturas primero y los DELETE al final, para que un borrado roto no contagie de rojo al resto.</p>
+
+        <div class="flow" id="flow">
+          <ol class="flow-steps" aria-label="Etapas de un test">
+            <li><button type="button" data-step="0" aria-label="1. Lee el contrato"><span class="n">1</span><span class="label">Lee el contrato</span><span class="bar"></span></button></li>
+            <li><button type="button" data-step="1" aria-label="2. Genera los casos"><span class="n">2</span><span class="label">Genera los casos</span><span class="bar"></span></button></li>
+            <li><button type="button" data-step="2" aria-label="3. Envía la petición"><span class="n">3</span><span class="label">Envía la petición</span><span class="bar"></span></button></li>
+            <li><button type="button" data-step="3" aria-label="4. Valida la respuesta"><span class="n">4</span><span class="label">Valida la respuesta</span><span class="bar"></span></button></li>
+            <li><button type="button" data-step="4" aria-label="5. Relee y limpia"><span class="n">5</span><span class="label">Relee y limpia</span><span class="bar"></span></button></li>
+          </ol>
+
+          <div class="flow-body">
+            <div class="card flow-panel" aria-live="polite">
+              <div class="fv" data-view="0">
+                <h3>1 · Lee el contrato</h3>
+                <p>El contrato ya dice qué debe responder cada operación: status, schema, seguridad y qué entra.</p>
+<pre class="code"><span class="rv" style="--i:0"><span class="k">/products/{id}</span>:</span><span class="rv" style="--i:1">  <span class="k">patch</span>:</span><span class="rv" style="--i:2">    security: [ bearer ]</span><span class="rv" style="--i:3">    requestBody: <span class="c">ProductPatch</span></span><span class="rv" style="--i:4">    responses:</span><span class="rv" style="--i:5">      200: <span class="c">Product   # price: number</span></span><span class="rv" style="--i:6">      401, 403, 422</span></pre>
+              </div>
+              <div class="fv" data-view="1">
+                <h3>2 · Genera los casos</h3>
+                <p>De esa sola operación salen ocho casos. Cada negativo rompe una sola regla del schema de entrada.</p>
+                <div class="cases">
+                  <span class="case rv" style="--i:0"><b>200</b> schema de Product</span>
+                  <span class="case rv" style="--i:1"><b>401</b> sin token</span>
+                  <span class="case rv" style="--i:2"><b>403</b> token de solo lectura</span>
+                  <span class="case rv" style="--i:3"><b>422</b> falta name</span>
+                  <span class="case rv" style="--i:4"><b>422</b> price: "abc"</span>
+                  <span class="case rv" style="--i:5"><b>422</b> price: -1</span>
+                  <span class="case rv" style="--i:6"><b>GET</b> relectura</span>
+                  <span class="case rv" style="--i:7"><b>p95</b> ≤ 300 ms</span>
+                </div>
+                <p class="fine rv" style="--i:8">De las 24 operaciones del contrato salen 186 casos.</p>
+              </div>
+              <div class="fv" data-view="2">
+                <h3>3 · Envía la petición</h3>
+                <p>Contra el entorno que elegiste, con la credencial que pide cada caso.</p>
+                <div class="wire"><span class="pill">eq</span><span class="line"><i class="pkt"></i></span><span class="pill">staging.api</span></div>
+<pre class="code"><span class="rv" style="--i:0"><span class="k">PATCH</span> /products/42 HTTP/1.1</span><span class="rv" style="--i:1">Authorization: Bearer <span class="c">••••••••</span></span><span class="rv" style="--i:2">Content-Type: application/json</span><span class="rv" style="--i:3"> </span><span class="rv" style="--i:4">{ "price": 19.9 }</span></pre>
+              </div>
+              <div class="fv" data-view="3">
+                <h3>4 · Valida la respuesta</h3>
+                <p>Un 200 no basta: cada campo se compara con el schema que el contrato declara.</p>
+                <ul class="verdicts">
+                  <li class="rv" style="--i:0"><span class="g g-ok">✓</span><span>status 200</span><span>esperado 200</span></li>
+                  <li class="rv" style="--i:1"><span class="g g-ok">✓</span><span><code>id</code>: 42</span><span>integer</span></li>
+                  <li class="rv" style="--i:2"><span class="g g-ok">✓</span><span><code>name</code>: "Lámpara"</span><span>string</span></li>
+                  <li class="rv bad" style="--i:3"><span class="g g-fail">✗</span><span><code>price</code>: "19.90"</span><span>string ≠ number</span></li>
+                  <li class="rv" style="--i:4"><span class="g g-ok">✓</span><span>38 ms</span><span>presupuesto 300 ms</span></li>
+                </ul>
+              </div>
+              <div class="fv" data-view="4">
+                <h3>5 · Relee y limpia</h3>
+                <p>Lo que se escribe se vuelve a leer para probar que persistió, y lo que se crea se borra al final.</p>
+                <ul class="verdicts">
+                  <li class="rv" style="--i:0"><span class="g g-ok">✓</span><span><code>GET /products/42</code></span><span>coincide con lo escrito</span></li>
+                  <li class="rv" style="--i:1"><span class="g g-ok">✓</span><span><code>DELETE /products/42</code></span><span>204 limpiado</span></li>
+                  <li class="rv" style="--i:2"><span class="g g-ok">✓</span><span><code>GET /products/42</code></span><span>404 ya no existe</span></li>
+                </ul>
+                <p class="fine rv" style="--i:3">El fallo queda en <code>report.html</code>, SARIF y JUnit, con la petición y la respuesta exactas.</p>
+              </div>
+            </div>
+
+            <div class="term flow-term" aria-hidden="true">
+              <div class="term-bar"><span></span><span></span><span></span><b>eq run — mock-store</b></div>
+              <pre id="flow-term"></pre>
+            </div>
+          </div>
+        </div>
+
+        <h3 class="steps-title">Tú solo pones tres cosas</h3>
         <div class="grid grid-3 steps">
           <div class="card step">
             <h3>Importa el contrato</h3>
@@ -347,6 +599,62 @@
             <h3>Corre la matriz</h3>
             <p>Empieza por la matriz GET; luego la completa, la de carga o llévala a tu CI con <code>eq run</code>.</p>
           </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="alt" id="resultados">
+      <div class="wrap">
+        <h2>Así se ven los resultados</h2>
+        <p class="section-lead">Datos de ejemplo de una corrida contra la tienda de prueba: la matriz funcional y una prueba de estrés del mismo proyecto.</p>
+        <div class="charts">
+          <article class="card chart-card">
+            <h3>Resumen de la corrida</h3>
+            <p class="sub">186 casos de 24 operaciones, en 3,4 s.</p>
+            <div class="kpis">
+              <div class="kpi"><b data-count="184">184</b><span><span class="g g-ok">✓</span>pasaron</span></div>
+              <div class="kpi"><b data-count="1">1</b><span><span class="g g-fail">✗</span>falló</span></div>
+              <div class="kpi"><b data-count="1">1</b><span><span class="g g-warn">!</span>fuera de presupuesto</span></div>
+              <div class="kpi"><b data-count="99" data-suffix="%">99%</b><span>tasa de éxito</span></div>
+            </div>
+            <div class="hbars" id="by-kind"></div>
+          </article>
+
+          <article class="card chart-card">
+            <h3>Latencia p95 por operación</h3>
+            <p class="sub">La marca vertical es el presupuesto declarado de cada operación.</p>
+            <div class="hbars" id="latency"></div>
+            <div class="legend"><span><i style="background:var(--accent)"></i>dentro del presupuesto</span><span><i style="background:var(--warn)"></i>lo supera</span><span><i class="line" style="background:var(--text);opacity:.55"></i>presupuesto</span></div>
+          </article>
+
+          <article class="card chart-card wide">
+            <h3>Prueba de estrés · <span class="mono" style="font-size:15px">GET /search</span></h3>
+            <p class="sub">Rampa, carga sostenida, pico y recuperación en 10 minutos. Pasa el cursor para ver cada instante.</p>
+            <div class="stress" id="stress"></div>
+            <div class="legend"><span><i style="background:var(--accent)"></i>usuarios virtuales</span><span><i class="line" style="background:var(--accent)"></i>latencia p95</span><span><i class="line" style="background:var(--warn)"></i>presupuesto 300 ms</span></div>
+          </article>
+        </div>
+      </div>
+    </section>
+    <div class="tip" id="tip" role="tooltip"></div>
+
+    <section id="en-vivo">
+      <div class="wrap">
+        <h2>Una corrida, tres vistas</h2>
+        <p class="section-lead">La misma corrida contra la tienda de prueba, vista desde la terminal, desde el contrato y desde el tablero.</p>
+        <div class="views-tabs" role="tablist" aria-label="Vistas de la corrida">
+          <button role="tab" id="tab-term" aria-controls="view-term" aria-selected="true">Terminal</button>
+          <button role="tab" id="tab-spec" aria-controls="view-spec" aria-selected="false" tabindex="-1">Del contrato a los casos</button>
+          <button role="tab" id="tab-dash" aria-controls="view-dash" aria-selected="false" tabindex="-1">Tablero</button>
+        </div>
+        <div class="view" id="view-term" role="tabpanel" aria-labelledby="tab-term">
+          <div class="term"><div class="term-bar"><span></span><span></span><span></span><b>eq run — mock-store</b></div><pre id="lv-term" aria-label="Salida de eq run"></pre></div>
+        </div>
+        <div class="view" id="view-spec" role="tabpanel" aria-labelledby="tab-spec" hidden>
+          <div class="lv-split"><div class="lv-spec" id="lv-spec" aria-hidden="true"></div><div class="lv-cases" id="lv-cases" aria-live="off"></div></div>
+        </div>
+        <div class="view" id="view-dash" role="tabpanel" aria-labelledby="tab-dash" hidden>
+          <div class="lv-dash"><div class="lv-kpis" id="lv-kpis"></div><div class="lv-panel" id="lv-bars"><h3>Latencia p95 frente al presupuesto</h3></div></div>
         </div>
       </div>
     </section>
@@ -543,6 +851,613 @@
 
     loadRelease();
     loadPipelines();
+  </script>
+  <script>
+    // Animations. No libraries: the hosted page's CSP allows only its own inline scripts.
+    const REDUCED = matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const css = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+    const rgb = (hex) => { const h = hex.replace("#", ""); const n = parseInt(h.length === 3 ? h.replace(/./g, "$&$&") : h, 16); return [n >> 16 & 255, n >> 8 & 255, n & 255]; };
+    const mix = (a, b, t) => a.map((v, i) => v + (b[i] - v) * t);
+    const rgba = (c, k = 1, a = 1) => `rgba(${c.map((v) => Math.min(255, Math.round(v * k))).join(",")},${a})`;
+    const clamp = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v));
+    const easeOutBack = (t) => 1 + 2.4 * (t - 1) ** 3 + 1.4 * (t - 1) ** 2;
+    const easeInOut = (t) => t < .5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2;
+    function whenVisible(el, cb, threshold = 0.25) {
+      const io = new IntersectionObserver((entries) => entries.forEach((e) => cb(e.isIntersecting)), { threshold });
+      io.observe(el);
+    }
+
+    // ── Hero: a run as it happens. Cases wait in a queue on the left; each worker thread takes the
+    // next one, sends it to its endpoint and brings the verdict back. Endpoints keep their tally.
+    (() => {
+      const stage = document.getElementById("stage");
+      const canvas = document.getElementById("runners");
+      const ctx = canvas.getContext("2d");
+      const ENDPOINTS = [["GET", "/products"], ["GET", "/products/{id}"], ["POST", "/products"], ["PATCH", "/products/{id}"], ["DELETE", "/products/{id}"], ["GET", "/orders"], ["POST", "/orders"], ["GET", "/orders/{id}"], ["GET", "/search"]];
+      const CHECKS = ["status", "schema", "401", "403", "persiste", "negativo", "p95"];
+      const TOTAL = 186, GLYPH = { ok: "✓", fail: "✗", warn: "!" };
+      const PICK = 340, GO = 680, DWELL = 140, BACK = 440;
+      const col = (c, a = 1) => rgba(c, 1, a);
+      const esc = (t) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;");
+
+      let P;
+      function readPalette() {
+        const surface = rgb(css("--surface")), dark = surface[0] + surface[1] + surface[2] < 300;
+        P = { dark, surface, ok: rgb(css("--ok")), fail: rgb(css("--fail")), warn: rgb(css("--warn")), text: rgb(css("--text")), muted: rgb(css("--muted")), border: rgb(css("--border")),
+          method: { GET: rgb(css("--ok")), POST: dark ? [124, 196, 240] : [37, 112, 178], PATCH: dark ? [201, 160, 240] : [128, 76, 192], DELETE: dark ? [240, 150, 140] : [184, 78, 70] } };
+      }
+      readPalette();
+      new MutationObserver(readPalette).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+      matchMedia("(prefers-color-scheme: dark)").addEventListener("change", readPalette);
+
+      // The run: 186 cases over the endpoints, one schema failure on PATCH and /search over budget.
+      function buildCases() {
+        let s = 11; const rnd = () => (s = (s * 16807) % 2147483647) / 2147483647;
+        const list = [];
+        for (let i = 0; i < TOTAL; i++) list.push({ e: Math.floor(rnd() * ENDPOINTS.length), check: CHECKS[Math.floor(rnd() * CHECKS.length)], res: "ok", ms: Math.round(9 + rnd() * 52) });
+        list[Math.floor(TOTAL * 0.52)] = { e: 3, check: "schema", res: "fail", ms: 31 };
+        list[Math.floor(TOTAL * 0.77)] = { e: 8, check: "p95", res: "warn", ms: 412 };
+        return list;
+      }
+
+      let W = 0, H = 0, dpr = 1, L = null;
+      function layout() {
+        const narrow = W < 640, workers = narrow ? 8 : 12;
+        const top = narrow ? 70 : 80, bottom = H - (narrow ? 100 : 74);
+        const qx = narrow ? 12 : 18, qw = narrow ? 34 : 150, qh = narrow ? 15 : 22, qgap = narrow ? 5 : 6;
+        const wx = narrow ? qx + qw + 30 : qx + qw + 92;
+        const ew = narrow ? 156 : 228, eh = narrow ? 22 : 30, ex = W - ew - (narrow ? 10 : 18);
+        const ys = (i, n, a, b) => a + (b - a) * (n === 1 ? 0.5 : i / (n - 1));
+        L = { narrow, workers, top, bottom, qx, qw, qh, qgap, wx, ew, eh, ex,
+          wy: Array.from({ length: workers }, (_, i) => ys(i, workers, top + 8, bottom - 8)),
+          ey: ENDPOINTS.map((_, j) => ys(j, ENDPOINTS.length, top + eh / 2, bottom - eh / 2)) };
+      }
+      function resize() {
+        dpr = Math.min(2, devicePixelRatio || 1); W = stage.clientWidth; H = stage.clientHeight;
+        canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr);
+        const before = L && L.workers;
+        layout();
+        if (before && before !== L.workers) reset();
+        if (REDUCED) finalFrame();
+      }
+
+      const bez = (a, b, t) => {
+        const dx = (b.x - a.x) * 0.5, u = 1 - t;
+        const c1 = { x: a.x + dx, y: a.y }, c2 = { x: b.x - dx, y: b.y };
+        return { x: u*u*u*a.x + 3*u*u*t*c1.x + 3*u*t*t*c2.x + t*t*t*b.x, y: u*u*u*a.y + 3*u*u*t*c1.y + 3*u*t*t*c2.y + t*t*t*b.y };
+      };
+      const wPos = (i) => ({ x: L.wx, y: L.wy[i] });
+      const ePos = (j) => ({ x: L.ex, y: L.ey[j] });
+      const ease = (t) => (t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2);
+
+      // State.
+      let cases, next, done, counts, packets, sparks, workers, ends, clock, holdUntil, history;
+      function reset() {
+        cases = buildCases(); next = 0; done = 0; counts = { ok: 0, fail: 0, warn: 0 }; packets = []; sparks = []; clock = 0; holdUntil = 0; history = [];
+        workers = Array.from({ length: L.workers }, (_, i) => ({ start: 300 + i * 260, busy: false, wait: 0, flash: 0, res: "ok", n: 0 }));
+        ends = ENDPOINTS.map(() => ({ pulse: 0, res: "ok", hits: 0, fail: 0, warn: 0 }));
+        hud(null);
+      }
+
+      const hudCase = document.getElementById("hud-case"), hudTotal = document.getElementById("hud-total");
+      const nOk = document.getElementById("n-ok"), nFail = document.getElementById("n-fail"), nWarn = document.getElementById("n-warn");
+      function hud(last) {
+        const active = workers.filter((w) => clock >= w.start).length;
+        hudTotal.textContent = `${active} hilos · ${done}/${TOTAL}`;
+        nOk.textContent = counts.ok; nFail.textContent = counts.fail; nWarn.textContent = counts.warn;
+        if (done === TOTAL) { hudCase.textContent = "Corrida completa · reporte JUnit, HTML y SARIF"; return; }
+        if (!last) { hudCase.textContent = "Leyendo el contrato · 186 casos en cola"; return; }
+        const [m, route] = ENDPOINTS[last.e];
+        hudCase.innerHTML = `<span class="g g-${last.res}">${GLYPH[last.res]}</span> ${m} ${esc(route)} · ${last.check} · ${last.ms} ms`;
+      }
+
+      function step(dt) {
+        clock += dt;
+        if (holdUntil) { if (clock > holdUntil) reset(); return; }
+        workers.forEach((w, i) => {
+          w.flash = Math.max(0, w.flash - dt / 600);
+          if (w.busy || clock < w.start) return;
+          w.wait -= dt;
+          if (w.wait > 0 || next >= TOTAL) return;
+          const c = cases[next++];
+          w.busy = true;
+          packets.push({ w: i, c, phase: "pick", t: 0 });
+        });
+        ends.forEach((en) => (en.pulse = Math.max(0, en.pulse - dt / 800)));
+        sparks.forEach((s) => { s.x += s.vx * dt; s.y += s.vy * dt; s.vx *= 0.94; s.vy *= 0.94; s.life -= dt / 600; });
+        sparks = sparks.filter((s) => s.life > 0);
+        for (const p of packets) {
+          const dur = { pick: PICK, go: GO, dwell: DWELL, back: BACK }[p.phase];
+          p.t += dt / dur;
+          if (p.t < 1) continue;
+          p.t = 0;
+          if (p.phase === "pick") p.phase = "go";
+          else if (p.phase === "go") {
+            p.phase = "dwell";
+            const en = ends[p.c.e]; en.pulse = 1; en.res = p.c.res; en.hits++;
+            if (p.c.res !== "ok") en[p.c.res]++;
+            const at = ePos(p.c.e), n = p.c.res === "ok" ? 7 : 16;
+            for (let k = 0; k < n; k++) { const a = Math.PI * (0.5 + Math.random()), v = 0.05 + Math.random() * (p.c.res === "ok" ? 0.08 : 0.16); sparks.push({ x: at.x, y: at.y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: 1, res: p.c.res }); }
+          } else if (p.phase === "dwell") p.phase = "back";
+          else {
+            p.dead = true; done++; counts[p.c.res]++;
+            const w = workers[p.w]; w.busy = false; w.wait = 30 + Math.random() * 180; w.flash = 1; w.res = p.c.res; w.n++;
+            history.push(p.c.res);
+            hud(p.c);
+          }
+        }
+        packets = packets.filter((p) => !p.dead);
+        if (done >= TOTAL && !packets.length) { holdUntil = clock + 3800; hud(null); }
+      }
+
+      function chip(x, y, w, h, m, text, alpha) {
+        ctx.fillStyle = col(P.surface, alpha); ctx.strokeStyle = col(P.method[m], 0.55 * alpha); ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.roundRect(x, y, w, h, 5); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = col(P.method[m], alpha); ctx.fillRect(x, y + 3, 2.5, h - 6);
+        if (!text) return;
+        ctx.textAlign = "left"; ctx.textBaseline = "middle";
+        ctx.fillStyle = col(P.method[m], alpha); ctx.fillText(m, x + 9, y + h / 2 + 0.5);
+        ctx.fillStyle = col(P.text, 0.75 * alpha);
+        let t = text; const room = w - 16 - ctx.measureText(m + " ").width;
+        while (t.length > 3 && ctx.measureText(t).width > room) t = t.slice(0, -2);
+        if (t !== text) t = t.slice(0, -1) + "…";
+        ctx.fillText(t, x + 9 + ctx.measureText(m + " ").width, y + h / 2 + 0.5);
+      }
+
+      function draw() {
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctx.clearRect(0, 0, W, H);
+        const mono = (px, wgt = 500) => `${wgt} ${px}px "JetBrains Mono", ui-monospace, monospace`;
+
+        // Dot grid and the faint mesh of every worker-endpoint route.
+        ctx.fillStyle = col(P.muted, P.dark ? 0.12 : 0.16);
+        for (let x = 12; x < W; x += 24) for (let y = 12; y < H; y += 24) ctx.fillRect(x, y, 1.2, 1.2);
+        ctx.lineWidth = 1; ctx.strokeStyle = col(P.border, P.dark ? 0.55 : 0.8);
+        ctx.beginPath();
+        for (let i = 0; i < L.workers; i++) for (let j = 0; j < ENDPOINTS.length; j += 2) {
+          const a = wPos(i), b = ePos(j);
+          ctx.moveTo(a.x, a.y); ctx.bezierCurveTo(a.x + (b.x - a.x) / 2, a.y, b.x - (b.x - a.x) / 2, b.y, b.x, b.y);
+        }
+        ctx.stroke();
+
+        // Queue: the next cases, fading down the column.
+        ctx.font = mono(L.narrow ? 8.5 : 10.5);
+        const rows = Math.max(0, Math.floor((L.bottom - L.top + 8) / (L.qh + L.qgap)));
+        ctx.textAlign = "left"; ctx.textBaseline = "alphabetic"; ctx.fillStyle = col(P.muted);
+        ctx.font = mono(L.narrow ? 9.5 : 11, 600);
+        ctx.fillText(L.narrow ? "cola" : `cola · ${TOTAL - next}`, L.qx, L.top - 12);
+        ctx.font = mono(L.narrow ? 8.5 : 10.5);
+        for (let k = 0; k < rows && next + k < TOTAL; k++) {
+          const c = cases[next + k], [m, route] = ENDPOINTS[c.e], a = Math.max(0.12, 1 - k / rows);
+          if (L.narrow) chip(L.qx, L.top + k * (L.qh + L.qgap), L.qw, L.qh, m, "", a);
+          else chip(L.qx, L.top + k * (L.qh + L.qgap), L.qw, L.qh, m, `${route} ${c.check}`, a);
+        }
+
+        const glow = P.dark ? "lighter" : "source-over";
+        // Active routes.
+        for (const p of packets) {
+          if (p.phase === "pick") continue;
+          const a = wPos(p.w), b = ePos(p.c.e), back = p.phase === "back";
+          const c = back ? P[p.c.res] : P.method[ENDPOINTS[p.c.e][0]];
+          ctx.strokeStyle = col(c, P.dark ? 0.22 : 0.3); ctx.lineWidth = 1.4;
+          ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.bezierCurveTo(a.x + (b.x - a.x) / 2, a.y, b.x - (b.x - a.x) / 2, b.y, b.x, b.y); ctx.stroke();
+        }
+
+        // Endpoint cards with their tally.
+        for (let j = 0; j < ENDPOINTS.length; j++) {
+          const [m, route] = ENDPOINTS[j], en = ends[j], y = L.ey[j] - L.eh / 2, x = L.ex;
+          const state = en.fail ? P.fail : en.warn ? P.warn : P.method[m];
+          if (en.pulse) {
+            const g = ctx.createRadialGradient(x, y + L.eh / 2, 0, x, y + L.eh / 2, 46);
+            g.addColorStop(0, col(P[en.res], 0.4 * en.pulse)); g.addColorStop(1, col(P[en.res], 0));
+            ctx.fillStyle = g; ctx.fillRect(x - 46, y - 30, 92 + L.ew, L.eh + 60);
+          }
+          ctx.fillStyle = col(P.surface, 0.94); ctx.strokeStyle = col(en.pulse > 0.35 ? P[en.res] : (en.fail || en.warn) ? state : P.border, en.pulse > 0.35 ? 0.95 : 1); ctx.lineWidth = en.fail || en.warn ? 1.6 : 1.2;
+          ctx.beginPath(); ctx.roundRect(x, y, L.ew, L.eh, 8); ctx.fill(); ctx.stroke();
+          ctx.fillStyle = col(P.method[m]); ctx.beginPath(); ctx.arc(x, y + L.eh / 2, 3.5, 0, 7); ctx.fill();
+          ctx.font = mono(L.narrow ? 9.5 : 12, 600); ctx.textAlign = "left"; ctx.textBaseline = "middle";
+          ctx.fillStyle = col(P.method[m]); ctx.fillText(m, x + 10, y + L.eh / 2 + 0.5);
+          const mw = ctx.measureText(m + " ").width;
+          ctx.font = mono(L.narrow ? 9.5 : 12); ctx.fillStyle = col(P.text, 0.92);
+          ctx.fillText(route, x + 10 + mw, y + L.eh / 2 + 0.5);
+          ctx.textAlign = "right"; ctx.font = mono(L.narrow ? 9 : 11, 600);
+          const tag = en.fail ? `✗ ${en.hits}` : en.warn ? `! ${en.hits}` : `${en.hits}`;
+          ctx.fillStyle = col(en.fail ? P.fail : en.warn ? P.warn : P.muted); ctx.fillText(tag, x + L.ew - 9, y + L.eh / 2 + 0.5);
+        }
+
+        // Workers: a node with a progress ring while a case is in flight.
+        for (let i = 0; i < L.workers; i++) {
+          const w = workers[i], { x, y } = wPos(i), on = clock >= w.start, r = L.narrow ? 7 : 9;
+          if (w.flash) { ctx.fillStyle = col(P[w.res], 0.28 * w.flash); ctx.beginPath(); ctx.arc(x, y, r + 12 * w.flash, 0, 7); ctx.fill(); }
+          ctx.fillStyle = col(P.surface); ctx.strokeStyle = col(on ? P.ok : P.border, on ? 0.55 : 1); ctx.lineWidth = 1.5;
+          ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill(); ctx.stroke();
+          const p = packets.find((q) => q.w === i);
+          if (p) {
+            const prog = { pick: 0, go: 0.15, dwell: 0.55, back: 0.65 }[p.phase] + p.t * { pick: 0.15, go: 0.4, dwell: 0.1, back: 0.35 }[p.phase];
+            ctx.strokeStyle = col(P.ok); ctx.lineWidth = 2.2;
+            ctx.beginPath(); ctx.arc(x, y, r + 3.5, -Math.PI / 2, -Math.PI / 2 + prog * Math.PI * 2); ctx.stroke();
+            ctx.fillStyle = col(P.ok); ctx.beginPath(); ctx.arc(x, y, 2.6, 0, 7); ctx.fill();
+          }
+          if (!L.narrow) {
+            ctx.font = mono(10.5); ctx.textAlign = "right"; ctx.textBaseline = "middle"; ctx.fillStyle = col(P.muted, on ? 1 : 0.45);
+            ctx.fillText(`hilo ${String(i + 1).padStart(2, "0")}`, x - r - 9, y);
+          }
+        }
+
+        // Cases on their way: a chip flies from the queue to a worker, then a comet to the endpoint and back.
+        ctx.font = mono(L.narrow ? 8 : 9.5);
+        for (const p of packets) {
+          const [m] = ENDPOINTS[p.c.e];
+          if (p.phase === "pick") {
+            const a = { x: L.qx + L.qw / 2, y: L.top + L.qh / 2 }, b = wPos(p.w), e = 1 - (1 - p.t) ** 3;
+            const x = a.x + (b.x - a.x) * e, y = a.y + (b.y - a.y) * e - Math.sin(e * Math.PI) * 14, s = 1 - e * 0.55;
+            chip(x - (L.narrow ? 12 : 22) * s, y - 7 * s, (L.narrow ? 24 : 44) * s, 14 * s, m, "", 1);
+            continue;
+          }
+          if (p.phase === "dwell") continue;
+          const back = p.phase === "back", c = back ? P[p.c.res] : P.method[m];
+          const a = wPos(p.w), b = ePos(p.c.e), e = ease(p.t);
+          const at = (k) => (back ? bez(b, a, k) : bez(a, b, k));
+          ctx.globalCompositeOperation = glow;
+          const N = 14;
+          for (let k = N; k >= 1; k--) {
+            const t0 = Math.max(0, e - k * 0.016), t1 = Math.max(0, e - (k - 1) * 0.016), q0 = at(t0), q1 = at(t1);
+            ctx.strokeStyle = col(c, 0.75 * (1 - k / N)); ctx.lineWidth = 3.6 * (1 - k / N) + 0.4;
+            ctx.beginPath(); ctx.moveTo(q0.x, q0.y); ctx.lineTo(q1.x, q1.y); ctx.stroke();
+          }
+          const h = at(e), g = ctx.createRadialGradient(h.x, h.y, 0, h.x, h.y, 16);
+          g.addColorStop(0, col(c, 0.55)); g.addColorStop(1, col(c, 0));
+          ctx.fillStyle = g; ctx.beginPath(); ctx.arc(h.x, h.y, 16, 0, 7); ctx.fill();
+          ctx.fillStyle = P.dark ? col([255, 255, 255], 0.9) : col(c); ctx.beginPath(); ctx.arc(h.x, h.y, 2.6, 0, 7); ctx.fill();
+          ctx.globalCompositeOperation = "source-over";
+        }
+
+        // Sparks where a case lands.
+        ctx.globalCompositeOperation = glow;
+        for (const s of sparks) { ctx.fillStyle = col(P[s.res], s.life); ctx.beginPath(); ctx.arc(s.x, s.y, 1.8 * s.life + 0.4, 0, 7); ctx.fill(); }
+        ctx.globalCompositeOperation = "source-over";
+
+        // The run's progress along the bottom edge, one tick per finished case.
+        const bw = W / TOTAL;
+        ctx.fillStyle = col(P.border); ctx.fillRect(0, H - 4, W, 4);
+        history.forEach((r, i) => { ctx.fillStyle = col(P[r]); ctx.fillRect(i * bw, H - 4, Math.ceil(bw), 4); });
+      }
+
+      function finalFrame() {
+        if (!L) return;
+        cases = cases || buildCases();
+        next = TOTAL; done = TOTAL; counts = { ok: TOTAL - 2, fail: 1, warn: 1 }; packets = []; sparks = []; clock = 1e9;
+        history = cases.map((c) => c.res);
+        ENDPOINTS.forEach((_, j) => { ends[j].hits = cases.filter((c) => c.e === j).length; ends[j].fail = cases.filter((c) => c.e === j && c.res === "fail").length; ends[j].warn = cases.filter((c) => c.e === j && c.res === "warn").length; });
+        hud(null); draw();
+      }
+
+      let running = false, visible = false, last = 0;
+      function frame(time) {
+        if (!running) return;
+        const dt = Math.min(50, time - last); last = time;
+        step(dt); draw();
+        requestAnimationFrame(frame);
+      }
+      function setRunning(on) {
+        if (REDUCED || on === running) return;
+        running = on;
+        if (on) { last = performance.now(); requestAnimationFrame(frame); }
+      }
+      resize(); reset();
+      new ResizeObserver(() => { resize(); if (!running && !REDUCED) draw(); }).observe(stage);
+      if (REDUCED) { finalFrame(); new MutationObserver(() => draw()).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] }); return; }
+      draw();
+      whenVisible(stage, (v) => { visible = v; setRunning(v && !document.hidden); }, 0.05);
+      document.addEventListener("visibilitychange", () => setRunning(visible && !document.hidden));
+    })();
+
+    // ── How a test runs: five stages that advance on their own, with the terminal writing along.
+    (() => {
+      const flow = document.getElementById("flow");
+      const buttons = [...flow.querySelectorAll("[data-step]")];
+      const views = [...flow.querySelectorAll("[data-view]")];
+      const term = document.getElementById("flow-term");
+      const DUR = 4800;
+      const L = (cls, text) => [cls, text];
+      const LINES = [
+        [L("cmd", "$ eq run --file store.eq.json --env staging"), L("dim", "Contrato  openapi 3.1 · 24 operaciones")],
+        [L("dim", "186 casos · lecturas primero, DELETE al final"), L("", " ")],
+        [L("ok", "  ✓ GET    /products        200  schema ok   38ms"), L("ok", "  ✓ GET    /orders          401  sin token    9ms"), L("ok", "  ✓ POST   /products        201  persistió   44ms"), L("dim", "  → PATCH  /products/42     bearer  {\"price\":19.9}")],
+        [L("fail", "  ✗ PATCH  /products/{id}   200  price: string ≠ number"), L("ok", "  ✓ POST   /products   422 negativo   12ms"), L("warn", "  ! GET    /search          p95 412ms > 300ms")],
+        [L("ok", "  ✓ GET    /products/42     relectura ok"), L("ok", "  ✓ DELETE /products/{id}   204  limpiado   17ms"), L("", " "), L("sum", ""), L("dim", "→ eq-report.xml · report.html · results.sarif")],
+      ];
+      const esc = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+      function lineHTML([cls, text]) {
+        if (cls === "sum") return '<span class="t-ok">184 pasaron</span> · <span class="t-fail">1 falló</span> · <span class="t-warn">1 fuera de presupuesto</span>';
+        const k = { cmd: "t-cmd", dim: "t-dim", ok: "", fail: "", warn: "" }[cls] ?? "";
+        if (cls === "ok" || cls === "fail" || cls === "warn") {
+          const m = text.match(/^(\s*)(\S)(.*)$/);
+          return `${m[1]}<span class="t-${cls}">${m[2]}</span>${esc(m[3]).replace(/(\d+ms|schema ok|sin token|persistió|negativo|limpiado|relectura ok)/g, '<span class="t-dim">$1</span>')}`;
+        }
+        return k ? `<span class="${k}">${esc(text)}</span>` : esc(text);
+      }
+      let step = -1, timer = 0, typing = [], inView = false;
+      function render(upTo, animateLast) {
+        typing.forEach(clearTimeout); typing = [];
+        const html = [];
+        for (let s = 0; s < upTo; s++) for (const l of LINES[s]) html.push(`<span class="ln" style="animation:none;opacity:1">${lineHTML(l)}</span>`);
+        term.innerHTML = html.join("");
+        const caret = document.createElement("span"); caret.className = "caret";
+        const add = (l) => { const el = document.createElement("span"); el.className = "ln"; el.innerHTML = lineHTML(l); term.insertBefore(el, caret); };
+        term.appendChild(caret);
+        if (upTo >= LINES.length) return;
+        if (!animateLast) { LINES[upTo].forEach(add); return; }
+        LINES[upTo].forEach((l, i) => typing.push(setTimeout(() => add(l), 350 + i * 520)));
+      }
+      function go(n, animate = true) {
+        step = n;
+        buttons.forEach((b, i) => {
+          b.classList.toggle("done", i < n);
+          b.classList.remove("active"); void b.offsetWidth; b.classList.toggle("active", i === n);
+          b.setAttribute("aria-current", i === n ? "step" : "false");
+        });
+        views.forEach((v, i) => { v.classList.remove("active"); if (i === n) { void v.offsetWidth; v.classList.add("active"); } });
+        render(n, animate && !REDUCED);
+        schedule();
+      }
+      function schedule() {
+        clearTimeout(timer);
+        if (REDUCED || !inView) return;
+        timer = setTimeout(() => go((step + 1) % buttons.length), step === buttons.length - 1 ? DUR + 1800 : DUR);
+      }
+      flow.style.setProperty("--dur", DUR + "ms");
+      if (REDUCED) flow.classList.add("paused");
+      buttons.forEach((b, i) => b.addEventListener("click", () => go(i)));
+      go(0, false);
+      whenVisible(flow, (v) => {
+        const first = v && !inView && step === 0 && !flow.dataset.started;
+        inView = v;
+        if (first) { flow.dataset.started = "1"; go(0); } else if (v) schedule(); else clearTimeout(timer);
+      }, 0.35);
+    })();
+
+    // ── Example results: bars, latency against budget and a stress test, drawn when they come into view.
+    (() => {
+      const tip = document.getElementById("tip");
+      function showTip(html, x, y) {
+        tip.innerHTML = html; tip.classList.add("on");
+        const w = tip.offsetWidth, h = tip.offsetHeight;
+        tip.style.left = Math.min(innerWidth - w - 8, Math.max(8, x + 14)) + "px";
+        tip.style.top = (y - h - 12 < 8 ? y + 18 : y - h - 12) + "px";
+      }
+      const hideTip = () => tip.classList.remove("on");
+      const row = (k, v) => `<div class="row"><span>${k}</span><b>${v}</b></div>`;
+
+      // Cases by kind.
+      const KINDS = [["Status", 24], ["Schema", 24, 1], ["Auth 401/403", 32], ["Persistencia", 18], ["Negativos", 64], ["Flujos", 12], ["Latencia", 12, 0, 1]];
+      const max1 = Math.max(...KINDS.map((k) => k[1]));
+      const byKind = document.getElementById("by-kind");
+      const tips = [];
+      const tipIndex = (html) => tips.push(html) - 1;
+      byKind.innerHTML = KINDS.map(([name, n, fail, warn]) => `
+        <div class="hbar" data-tip="${tipIndex(`<b>${name}</b>${row("casos", n)}${fail ? row("fallaron", fail) : ""}${warn ? row("fuera de presupuesto", warn) : ""}`)}">
+          <span class="lbl">${name}</span>
+          <span class="track"><span class="fillb" data-w="${(n / max1) * 100}"></span></span>
+          <span class="val">${n}${fail ? ' <span class="g g-fail">✗</span>' : warn ? ' <span class="g g-warn">!</span>' : ""}</span>
+        </div>`).join("");
+
+      // p95 per operation against its budget.
+      const LAT = [["GET /products", 38, 200], ["GET /products/{id}", 21, 150], ["GET /orders", 64, 200], ["GET /search", 412, 300], ["POST /products", 44, 250], ["PATCH /products/{id}", 52, 250], ["POST /orders", 118, 400], ["DELETE /products/{id}", 17, 150]];
+      const max2 = 450;
+      const latency = document.getElementById("latency");
+      latency.innerHTML = LAT.map(([op, p95, budget]) => `
+        <div class="hbar mono-lbl" data-tip="${tipIndex(`<b>${op}</b>${row("p95", p95 + " ms")}${row("presupuesto", budget + " ms")}`)}">
+          <span class="lbl">${op}</span>
+          <span class="track"><span class="fillb${p95 > budget ? " warn" : ""}" data-w="${(p95 / max2) * 100}"></span><span class="budget" style="left:${(budget / max2) * 100}%"></span></span>
+          <span class="val">${p95}</span>
+        </div>`).join("");
+
+      for (const el of document.querySelectorAll(".hbar[data-tip]")) {
+        el.addEventListener("pointermove", (e) => showTip(tips[el.dataset.tip], e.clientX, e.clientY));
+        el.addEventListener("pointerleave", hideTip);
+      }
+      for (const box of [byKind, latency]) whenVisible(box, (v) => {
+        if (!v) return;
+        box.querySelectorAll(".fillb").forEach((b, i) => setTimeout(() => (b.style.width = b.dataset.w + "%"), REDUCED ? 0 : i * 70));
+      });
+
+      // Stress test: virtual users and p95 over ten minutes, one chart each on a shared time axis.
+      let s = 11; const rnd = () => (s = (s * 16807) % 2147483647) / 2147483647;
+      const POINTS = 121; // one every 5 s
+      const data = [];
+      for (let i = 0; i < POINTS; i++) {
+        const t = i * 5;
+        const vus = t < 120 ? (t / 120) * 50 : t < 300 ? 50 : t < 330 ? 50 + ((t - 300) / 30) * 150 : t < 360 ? 200 : t < 390 ? 200 - ((t - 360) / 30) * 150 : t < 480 ? 50 : 50 - ((t - 480) / 120) * 50;
+        const p95 = 90 + vus * 0.9 + (vus > 120 ? (vus - 120) * 3.2 : 0) + rnd() * 26 - 8;
+        data.push({ t, vus: Math.round(vus), p95: Math.round(p95) });
+      }
+      const PHASES = [[0, 120, "rampa"], [120, 300, "sostenido"], [300, 390, "pico"], [390, 600, "recuperación"]];
+      const stress = document.getElementById("stress");
+      const fmtT = (t) => `${Math.floor(t / 60)}:${String(t % 60).padStart(2, "0")}`;
+      let drawn = false;
+
+      function build() {
+        const w = Math.max(280, stress.clientWidth), pad = { l: 44, r: 12 }, iw = w - pad.l - pad.r;
+        const X = (t) => pad.l + (t / 600) * iw;
+        function chart(title, key, ymax, ticks, budget) {
+          const h = 150, top = 22, ih = h - top - 24;
+          const Y = (v) => top + ih - (v / ymax) * ih;
+          const pts = data.map((d) => [X(d.t), Y(d[key])]);
+          const path = pts.map((p, i) => (i ? "L" : "M") + p[0].toFixed(1) + "," + p[1].toFixed(1)).join("");
+          const area = key === "vus" ? `<path d="${path}L${X(600)},${Y(0)}L${X(0)},${Y(0)}Z" fill="var(--accent)" opacity=".18"/>` : "";
+          const phases = PHASES.map(([a, b, name], i) => `${i % 2 ? `<rect x="${X(a)}" y="${top}" width="${X(b) - X(a)}" height="${ih}" fill="var(--accent-soft)" opacity=".55"/>` : ""}${key === "vus" && X(b) - X(a) > name.length * 6.6 + 12 ? `<text class="phase-label" x="${X(a) + 6}" y="${top - 8}">${name}</text>` : ""}`).join("");
+          const grid = ticks.map((v) => `<line x1="${pad.l}" x2="${w - pad.r}" y1="${Y(v)}" y2="${Y(v)}"/><text x="${pad.l - 8}" y="${Y(v) + 4}" text-anchor="end">${v}</text>`).join("");
+          const xt = key === "p95" ? [0, 120, 240, 360, 480, 600].map((t) => `<text x="${X(t)}" y="${h - 4}" text-anchor="middle">${fmtT(t)}</text>`).join("") : "";
+          const budgetLine = budget ? `<line x1="${pad.l}" x2="${w - pad.r}" y1="${Y(budget)}" y2="${Y(budget)}" stroke="var(--warn)" stroke-width="1.5" stroke-dasharray="5 4"/>` : "";
+          return `<h4>${title}</h4><svg class="svgchart" viewBox="0 0 ${w} ${h}" height="${h}" data-key="${key}" data-top="${top}" data-ih="${ih}">
+            ${phases}<g class="grid">${grid}</g>${xt}${area}${budgetLine}
+            <path class="series" d="${path}" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+            <line class="xh" x1="0" x2="0" y1="${top}" y2="${top + ih}" stroke="var(--muted)" stroke-width="1" opacity="0"/>
+            <circle class="dot" r="4.5" fill="var(--accent)" stroke="var(--surface)" stroke-width="2" opacity="0"/>
+            <rect class="hit" x="${pad.l}" y="0" width="${iw}" height="${h}" fill="transparent"/>
+          </svg>`;
+        }
+        stress.innerHTML = chart("Usuarios virtuales", "vus", 220, [0, 100, 200]) + chart("Latencia p95 (ms)", "p95", 800, [0, 300, 600], 300) +
+          `<table class="sr-only"><caption>Prueba de estrés de GET /search</caption><tr><th>tiempo</th><th>usuarios</th><th>p95 ms</th></tr>${data.filter((_, i) => i % 6 === 0).map((d) => `<tr><td>${fmtT(d.t)}</td><td>${d.vus}</td><td>${d.p95}</td></tr>`).join("")}</table>`;
+
+        const svgs = [...stress.querySelectorAll("svg")];
+        for (const svg of svgs) {
+          const path = svg.querySelector(".series");
+          if (!drawn && !REDUCED) { const len = path.getTotalLength(); path.style.strokeDasharray = len; path.style.strokeDashoffset = len; }
+          svg.querySelector(".hit").addEventListener("pointermove", (e) => {
+            const b = svg.getBoundingClientRect();
+            const t = clamp(((e.clientX - b.left) * (w / b.width) - pad.l) / iw) * 600;
+            const d = data[Math.round(t / 5)];
+            for (const other of svgs) {
+              const key = other.dataset.key, top = +other.dataset.top, ih = +other.dataset.ih, ymax = key === "vus" ? 220 : 800;
+              const x = X(d.t), y = top + ih - (d[key] / ymax) * ih;
+              other.querySelector(".xh").setAttribute("x1", x); other.querySelector(".xh").setAttribute("x2", x); other.querySelector(".xh").setAttribute("opacity", ".6");
+              const dot = other.querySelector(".dot"); dot.setAttribute("cx", x); dot.setAttribute("cy", y); dot.setAttribute("opacity", "1");
+            }
+            const phase = PHASES.find(([a, b2]) => d.t >= a && d.t <= b2)[2];
+            showTip(`<b>${fmtT(d.t)} · ${phase}</b>${row("usuarios", d.vus)}${row("p95", d.p95 + " ms" + (d.p95 > 300 ? ' <span class="g g-warn">!</span>' : ""))}`, e.clientX, e.clientY);
+          });
+          svg.querySelector(".hit").addEventListener("pointerleave", () => {
+            hideTip();
+            for (const other of svgs) { other.querySelector(".xh").setAttribute("opacity", "0"); other.querySelector(".dot").setAttribute("opacity", "0"); }
+          });
+        }
+      }
+      function reveal() {
+        if (drawn) return; drawn = true;
+        for (const path of stress.querySelectorAll(".series")) {
+          path.style.transition = "stroke-dashoffset 2.2s cubic-bezier(.3,.7,.3,1)";
+          requestAnimationFrame(() => (path.style.strokeDashoffset = "0"));
+        }
+      }
+      let lastW = 0;
+      new ResizeObserver(() => { if (stress.clientWidth !== lastW) { lastW = stress.clientWidth; build(); } }).observe(stress);
+      whenVisible(stress, (v) => v && reveal());
+    })();
+
+    // ── Live views: one run as a terminal, as contract-to-cases and as a dashboard. Only the
+    // selected view animates, and only while the section is on screen.
+    (function liveViews() {
+      const tabs = [...document.querySelectorAll('.views-tabs [role="tab"]')];
+      if (!tabs.length) return;
+      const esc = (t) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+      const mark = { ok: "✓", fail: "✗", warn: "!" };
+      let token = 0, current = "term", onScreen = false;
+      const wait = (ms, my) => new Promise((ok, stop) => setTimeout(() => (my === token ? ok() : stop()), REDUCED ? 0 : ms));
+
+      async function terminal(my) {
+        const pre = document.getElementById("lv-term");
+        const rows = [
+          ["cmd", "eq run --file store.eq.json --env staging"],
+          ["dim", "Contrato  openapi 3.1 · 24 operaciones · 186 casos"], ["", ""],
+          ["ok", "GET    /products              ", "200  schema ok   38ms"],
+          ["ok", "GET    /products/{id}         ", "200  schema ok   21ms"],
+          ["ok", "GET    /orders                ", "401  sin token    9ms"],
+          ["ok", "GET    /orders                ", "403  read-token  11ms"],
+          ["ok", "POST   /products              ", "201  persistió   44ms"],
+          ["fail", "PATCH  /products/{id}         ", "200  price: string ≠ number"],
+          ["warn", "GET    /search                ", "p95 412ms > presupuesto 300ms"],
+          ["ok", "DELETE /products/{id}         ", "204  limpiado    17ms"], ["", ""], ["sum"],
+        ];
+        for (;;) {
+          let html = "";
+          for (const [kind, a, b] of rows) {
+            if (kind === "cmd") {
+              html += '<span class="t-dim">$</span> ';
+              if (!REDUCED) for (let i = 1; i <= a.length; i++) { pre.innerHTML = html + '<span class="t-cmd">' + esc(a.slice(0, i)) + '</span><span class="caret"></span>'; await wait(26, my); }
+              html += '<span class="t-cmd">' + esc(a) + "</span>\n";
+            } else if (kind === "dim") html += '<span class="t-dim">' + esc(a) + "</span>\n";
+            else if (kind === "sum") html += '<span class="t-ok">184 pasaron</span> · <span class="t-fail">1 falló</span> · <span class="t-warn">1 fuera de presupuesto</span>\n<span class="t-dim">→ eq-report.xml · report.html · results.sarif</span>\n';
+            else if (!kind) html += "\n";
+            else html += '  <span class="t-' + kind + '">' + mark[kind] + "</span> " + esc(a) + '<span class="' + (kind === "ok" ? "t-dim" : "t-" + kind) + '">' + esc(b) + "</span>\n";
+            pre.innerHTML = html + '<span class="caret"></span>';
+            await wait(kind === "cmd" ? 380 : 360, my);
+          }
+          await wait(4500, my);
+        }
+      }
+
+      async function contract(my) {
+        const spec = document.getElementById("lv-spec"), list = document.getElementById("lv-cases");
+        const ops = [["get", "/products", "ok", "200 · schema ok"], ["get", "/products/{id}", "ok", "200 · schema ok"], ["get", "/orders", "ok", "401 · sin token"], ["post", "/products", "ok", "201 · persistió"], ["patch", "/products/{id}", "fail", "price ≠ number"], ["get", "/search", "warn", "p95 412 > 300 ms"], ["delete", "/products/{id}", "ok", "204 · limpiado"]];
+        spec.innerHTML = '<div><span class="k">openapi</span>: 3.1.0</div><div><span class="k">paths</span>:</div>' + ops.map((o) => "<div>  " + esc(o[1]) + ':\n    <span class="k">' + o[0] + "</span>: …</div>").join("");
+        const lines = [...spec.children].slice(2);
+        for (;;) {
+          list.innerHTML = "";
+          for (let i = 0; i < ops.length; i++) {
+            const [m, p, st, d] = ops[i];
+            lines.forEach((l, j) => l.classList.toggle("on", j === i));
+            const card = document.createElement("div");
+            card.className = "lv-case";
+            card.innerHTML = '<span class="st">…</span><span class="nm">' + m.toUpperCase() + " " + esc(p) + '</span><span class="ds"></span>';
+            list.append(card);
+            requestAnimationFrame(() => card.classList.add("in"));
+            await wait(600, my);
+            card.classList.add(st); card.querySelector(".st").textContent = mark[st]; card.querySelector(".ds").textContent = d;
+            await wait(420, my);
+          }
+          lines.forEach((l) => l.classList.remove("on"));
+          await wait(3800, my);
+        }
+      }
+
+      const kpis = [["var(--ok)", 184, "pasaron"], ["var(--fail)", 1, "falló"], ["var(--warn)", 1, "fuera de presupuesto"], ["var(--text)", 99, "% de éxito"]];
+      const lat = [["GET /products", 38, 200], ["GET /products/{id}", 21, 150], ["POST /products", 44, 250], ["GET /orders", 52, 200], ["GET /search", 412, 300], ["DELETE /products/{id}", 17, 150]];
+      const MAX = 480;
+      document.getElementById("lv-kpis").innerHTML = kpis.map((k) => '<div class="lv-kpi"><b style="color:' + k[0] + '">0</b><span>' + k[2] + "</span></div>").join("");
+      const panel = document.getElementById("lv-bars");
+      lat.forEach(([n, v, b]) => {
+        const row = document.createElement("div");
+        row.className = "lv-bar" + (v > b ? " over" : "");
+        row.innerHTML = '<span class="lbl">' + esc(n) + '</span><span class="trk"><span class="fill"></span><span class="bud" style="left:' + (b / MAX * 100) + '%"></span></span><span class="v">0 ms</span>';
+        panel.append(row);
+      });
+      async function dashboard(my) {
+        const rows = [...panel.querySelectorAll(".lv-bar")], nums = [...document.querySelectorAll("#lv-kpis b")];
+        for (;;) {
+          rows.forEach((r) => { r.querySelector(".fill").style.width = "0"; r.querySelector(".v").textContent = "0 ms"; });
+          nums.forEach((n) => (n.textContent = "0"));
+          await wait(500, my);
+          const t0 = performance.now(), D = REDUCED ? 1 : 1400;
+          await new Promise((done) => (function tick(now) {
+            const t = Math.min(1, (now - t0) / D), e = 1 - (1 - t) ** 3;
+            nums.forEach((n, i) => (n.textContent = Math.round(kpis[i][1] * e)));
+            t < 1 && my === token ? requestAnimationFrame(tick) : done();
+          })(t0));
+          for (let i = 0; i < rows.length; i++) {
+            rows[i].querySelector(".fill").style.width = (lat[i][1] / MAX * 100) + "%";
+            rows[i].querySelector(".v").textContent = lat[i][1] + " ms";
+            await wait(240, my);
+          }
+          await wait(5200, my);
+        }
+      }
+
+      const run = { term: terminal, spec: contract, dash: dashboard };
+      function restart() {
+        const my = ++token;
+        if (onScreen) run[current](my).catch(() => {});
+      }
+      function select(tab, focus) {
+        tabs.forEach((t) => {
+          const on = t === tab;
+          t.setAttribute("aria-selected", on); t.tabIndex = on ? 0 : -1;
+          document.getElementById(t.getAttribute("aria-controls")).hidden = !on;
+        });
+        if (focus) tab.focus();
+        current = tab.id.slice(4);
+        restart();
+      }
+      tabs.forEach((t, i) => {
+        t.addEventListener("click", () => select(t));
+        t.addEventListener("keydown", (e) => {
+          const d = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;
+          if (d) { e.preventDefault(); select(tabs[(i + d + tabs.length) % tabs.length], true); }
+        });
+      });
+      whenVisible(document.getElementById("en-vivo"), (v) => { if (v !== onScreen) { onScreen = v; v ? restart() : token++; } }, 0.2);
+    })();
   </script>
 </body>
 </html>
