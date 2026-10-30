@@ -31,7 +31,7 @@
   },
   "devDependencies": {
     "@types/node": "22.19.19",
-    "@types/pg": "8.15.6",
+    "@types/pg": "8.23.1",
     "@types/sql.js": "1.4.9",
     "tsx": "4.23.15",
     "typescript": "5.9.3"
