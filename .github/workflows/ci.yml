@@ -25,11 +25,11 @@ jobs:
       run:
         shell: bash
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
         with:
           version: 11
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ matrix.node }}
           cache: pnpm
@@ -48,7 +48,7 @@ jobs:
           node apps/cli/dist/eq.cjs run --file examples/mock-store/mock-store.eq.json --env local --junit eq-report.xml --html eq-report.html --sarif eq-report.sarif
           node -e 'const log = JSON.parse(require("fs").readFileSync("eq-report.sarif", "utf8")); if (log.version !== "2.1.0") process.exit(1)'
           grep -q '<!doctype html>' eq-report.html
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: eq-report-${{ matrix.os }}-node${{ matrix.node }}
@@ -80,11 +80,11 @@ jobs:
       EQ_TEST_POSTGRES_URL: postgres://eq:eq@127.0.0.1:5432/eq
       EQ_TEST_REDIS_URL: redis://127.0.0.1:6379
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
         with:
           version: 11
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: pnpm
@@ -95,7 +95,7 @@ jobs:
     name: Docker image
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Build the image
         run: docker build -t endpoint-quality:ci .
       - name: Start it with PostgreSQL and Redis and check it answers
